@@ -12,6 +12,7 @@ import { saveTrackingTargetsAction } from '@/app/actions/tracking-targets'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { postalRules, sanitizePostalInput } from '@/lib/scanner/postal-input'
+import { GRID_DIMENSIONS, DEFAULT_GRID_SIZE, gridPointCount, type GridSize } from '@/lib/scanner/grid-scan'
 
 interface TrackingTargetFormProps {
   target?: TrackingTarget
@@ -48,6 +49,7 @@ export default function TrackingTargetForm({
   )
   const [customCity, setCustomCity] = useState(target?.custom_city || '')
   const [postalCode, setPostalCode] = useState(target?.postal_code || '')
+  const [gridSize, setGridSize] = useState<GridSize>(target?.grid_size || DEFAULT_GRID_SIZE)
   const [radiusCenterZip, setRadiusCenterZip] = useState(target?.radius_center_zip || '')
   const [radiusMiles, setRadiusMiles] = useState<number>(target?.radius_miles || 5)
   const [bulkMode, setBulkMode] = useState(false)
@@ -263,6 +265,7 @@ export default function TrackingTargetForm({
             // points in miles around a US ZIP.
             { value: 'zip', label: t.locationModeZip },
             { value: 'exact_point', label: t.locationModeExactPoint },
+            { value: 'grid', label: t.locationModeGrid },
             ...(projectCountry?.toUpperCase() === 'US' ? [{ value: 'radius', label: t.locationModeRadius }] : []),
           ]}
         />
@@ -416,7 +419,23 @@ export default function TrackingTargetForm({
         </div>
       )}
 
-      <input type="hidden" name="grid_size" value="" />
+      {locationMode === 'grid' ? (
+        <div className="space-y-2">
+          <Select
+            label={t.gridSizeLabel}
+            name="grid_size"
+            value={gridSize}
+            onChange={(e) => setGridSize(e.target.value as GridSize)}
+            options={(Object.keys(GRID_DIMENSIONS) as GridSize[]).map((size) => ({
+              value: size,
+              label: `${GRID_DIMENSIONS[size]} × ${GRID_DIMENSIONS[size]}`,
+            }))}
+          />
+          <div className="text-caption text-muted">{t.gridSizeHint(gridPointCount(gridSize))}</div>
+        </div>
+      ) : (
+        <input type="hidden" name="grid_size" value="" />
+      )}
       {locationMode === 'project' && (
         <input type="hidden" name="custom_city" value="" />
       )}

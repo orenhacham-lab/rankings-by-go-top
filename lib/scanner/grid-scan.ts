@@ -211,3 +211,62 @@ export function gridBucket(result: Pick<GridPointResult, 'found' | 'position'>):
   if (p <= 10) return 'top10'
   return 'rest'
 }
+
+/**
+ * HOW THE POINTS ARE ACTUALLY MEASURED, and why this is not a `for` loop.
+ *
+ * A 5 x 5 grid is 25 provider requests and a 7 x 7 is 49. At the measured 1.8
+ * seconds a request, serial execution is 45 and 88 seconds, and /api/scan has
+ * `maxDuration = 60` with a 45-second operation budget inside it — so a serial
+ * grid could not finish even at its smallest size. The points are therefore
+ * measured a few at a time, and the batch STOPS at the deadline rather than
+ * being cut off by the platform mid-request.
+ *
+ * A stopped grid is not a failed grid: `gridMetrics` reads whatever was
+ * measured, the points that were reached are stored, and `skipped` says how
+ * many were not. Reporting 18 of 25 honestly is worth more than reporting 25
+ * and having invented 7.
+ *
+ * The query is passed in, so every one of these decisions is testable without
+ * a network: see lib/scanner/__qa__/grid-scan.qa.ts.
+ */
+export const DEFAULT_GRID_CONCURRENCY = 5
+
+export interface GridRunOutcome {
+  results: GridPointResult[]
+  /** Points never reached, because the deadline arrived first. */
+  skipped: number
+  stoppedForDeadline: boolean
+}
+
+export async function runGridScan(
+  points: GridPoint[],
+  query: (point: GridPoint) => Promise<Omit<GridPointResult, 'point'>>,
+  options: { concurrency?: number; deadlineAtMs?: number; now?: () => number } = {}
+): Promise<GridRunOutcome> {
+  const concurrency = Math.max(1, Math.floor(options.concurrency ?? DEFAULT_GRID_CONCURRENCY))
+  const now = options.now ?? (() => Date.now())
+  const deadlineAtMs = options.deadlineAtMs ?? Number.POSITIVE_INFINITY
+  const results: GridPointResult[] = []
+  let stoppedForDeadline = false
+
+  for (let i = 0; i < points.length; i += concurrency) {
+    if (now() >= deadlineAtMs) {
+      stoppedForDeadline = true
+      break
+    }
+    const batch = points.slice(i, i + concurrency)
+    const settled = await Promise.all(
+      batch.map(async (point) => {
+        try {
+          return { point, ...(await query(point)) }
+        } catch (err) {
+          return { point, found: false, position: null, error: (err as Error).message }
+        }
+      })
+    )
+    results.push(...settled)
+  }
+
+  return { results, skipped: points.length - results.length, stoppedForDeadline }
+}

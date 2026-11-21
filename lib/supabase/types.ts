@@ -318,7 +318,16 @@ export interface Project {
 }
 
 export type EngineType = 'google_search' | 'google_maps'
-export type LocationMode = 'project' | 'custom' | 'zip' | 'exact_point' | 'radius'
+/**
+ * 'grid' is BACK, and deliberately. It was removed in April 2026 (109b5597)
+ * leaving `grid_size` in the table and a converter in the scan route, because
+ * the implementation behind it measured eight compass points in miles with
+ * English labels. What replaces it is lib/scanner/grid-scan.ts: an n x n square
+ * in kilometres, one stored row per point, and a position per point the map can
+ * draw. Rows still carrying the old 'grid' value are read by the same code, so
+ * the converter in app/api/scan/route.ts is no longer needed.
+ */
+export type LocationMode = 'project' | 'custom' | 'zip' | 'exact_point' | 'radius' | 'grid'
 export type GridSize = 'small' | 'medium' | 'large'
 export type ExactPointResolutionSource =
   | 'user_provided_coordinates'

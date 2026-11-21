@@ -1,6 +1,15 @@
 import { ScanInput, ScanOutput, ScanAudit, ScanAttempt } from './types'
 import { US_ZIP_CODES, type USZIPCode } from './us-zip-codes'
 import { generateRadiusPoints, aggregateRadiusResults, type RadiusPointResult } from './radius-scan'
+import {
+  DEFAULT_GRID_SIZE,
+  DEFAULT_GRID_SPACING_KM,
+  generateGridPoints,
+  gridMetrics,
+  gridPointCount,
+  runGridScan,
+  type GridPoint,
+} from './grid-scan'
 import { serperBody } from './serper-payload'
 import { geocodeAddress } from '../geocoding'
 
@@ -589,6 +598,134 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
 
   if (input.locationMode === 'exact_point' && !input.exactPoint) {
     console.warn('[Maps:exact_point] WARNING: locationMode=exact_point but no exactPoint coords provided')
+  }
+
+  // GEO-GRID MODE: the same keyword measured from an n x n square of points.
+  //
+  // The centre is the business's own location, resolved from whatever the
+  // keyword already has: its exact point, else its postal code (in the
+  // project's own country), else the project's city. Grid mode never guesses a
+  // centre: with none of the three it is an error, because a grid drawn around
+  // the wrong place is worse than no grid.
+  if (input.locationMode === 'grid') {
+    const size = input.gridSize || DEFAULT_GRID_SIZE
+    const spacingKm = input.gridSpacingKm && input.gridSpacingKm > 0 ? input.gridSpacingKm : DEFAULT_GRID_SPACING_KM
+    console.log(`[Maps:grid] BRANCH TAKEN: ${size} (${gridPointCount(size)} points, ${spacingKm}km apart)`)
+
+    let center: { lat: number; lng: number } | null = null
+    let centerSource = ''
+    if (input.exactPoint) {
+      center = { lat: input.exactPoint.lat, lng: input.exactPoint.lng }
+      centerSource = 'exact_point'
+    } else if (input.postalCode?.trim()) {
+      const resolved = await resolvePostalCode(input.postalCode.trim(), country)
+      if (resolved) {
+        center = { lat: resolved.lat, lng: resolved.lng }
+        centerSource = `postal_code_${resolved.provider}`
+      }
+    }
+    if (!center && input.city?.trim()) {
+      const geo = await geocodeAddress(input.city.trim(), country)
+      if (geo.ok) {
+        center = { lat: geo.lat, lng: geo.lng }
+        centerSource = `city_${geo.provider}`
+      }
+    }
+    if (!center) {
+      const message = 'Grid mode needs a centre: add an exact point, a postal code or a city to this keyword.'
+      console.error('[Maps:grid]', message)
+      const audit = buildAudit(input, country, language, null, [], false, null, null, null, undefined, message, null)
+      return { ...makeError(message, input, audit), audit }
+    }
+
+    const points = generateGridPoints(center.lat, center.lng, size, spacingKm)
+    let lastResponse: SerperMapsResponse | null = null
+    const outcome = await runGridScan(
+      points,
+      async (point: GridPoint) => {
+        const response = await querySerperMaps(input.keyword, country, language, undefined, { lat: point.lat, lng: point.lng })
+        lastResponse = response
+        if (!response) return { found: false, position: null, error: 'No response from Serper' }
+        if (response.error) return { found: false, position: null, error: response.error }
+        const matched = findBusinessMatch(response.places ?? [], businessName, input.targetDomain)
+        if (!matched) return { found: false, position: null }
+        return { found: true, position: matched.position, title: matched.title, address: matched.address || null }
+      },
+      { deadlineAtMs: input.gridDeadlineAtMs ?? undefined }
+    )
+
+    const metrics = gridMetrics(outcome.results)
+    const centerResult = outcome.results.find((r) => r.point.isCenter) || null
+    console.log(`[Maps:grid] ${metrics.foundCount}/${metrics.pointsScanned} points found the business` +
+      `${outcome.skipped > 0 ? `, ${outcome.skipped} not reached before the deadline` : ''}` +
+      `; average over every point ${metrics.averageTotalPosition.toFixed(1)}`)
+
+    const auditAttempts: ScanAttempt[] = outcome.results.map((r, idx) => ({
+      attemptNumber: idx + 1,
+      context: `grid ${size} r${r.point.row}c${r.point.col}${r.point.isCenter ? ' (centre)' : ''}`,
+      location: null,
+      ll: `@${r.point.lat},${r.point.lng},13z`,
+      found: r.found,
+      matchedTitle: r.title || null,
+      matchedPosition: r.position ?? null,
+      matchedAddress: r.address || null,
+    }))
+
+    // The headline is the CENTRE point, so the trend stays comparable with this
+    // keyword's history and the best of 25 points can never stand in for it.
+    const headlineFound = Boolean(centerResult?.found)
+    const headlinePosition = centerResult?.position ?? null
+    const audit = buildAudit(
+      input, country, language, lastResponse, auditAttempts, headlineFound,
+      headlinePosition, centerResult?.title || null, centerResult?.address || null,
+      headlineFound ? 0 : undefined, null, null
+    )
+    if (audit.decision) {
+      const d = audit.decision as Record<string, unknown>
+      d.grid_used = true
+      d.grid_size = size
+      d.grid_spacing_km = spacingKm
+      d.grid_center_lat = center.lat
+      d.grid_center_lng = center.lng
+      d.grid_center_source = centerSource
+      d.executed_points = metrics.pointsScanned
+      d.skipped_points = outcome.skipped
+      d.early_stopped = outcome.stoppedForDeadline
+      d.grid_average_total_position = metrics.averageTotalPosition
+    }
+
+    return {
+      found: headlineFound,
+      position: headlinePosition,
+      resultUrl: null,
+      resultTitle: centerResult?.title || null,
+      resultAddress: centerResult?.address || null,
+      error: null,
+      audit,
+      gridScanMetadata: {
+        gridSize: size,
+        spacingKm,
+        centerLat: center.lat,
+        centerLng: center.lng,
+        pointsPlanned: points.length,
+        pointsScanned: metrics.pointsScanned,
+        skippedPoints: outcome.skipped,
+        stoppedForDeadline: outcome.stoppedForDeadline,
+        foundCount: metrics.foundCount,
+        averagePosition: metrics.averagePosition,
+        averageTotalPosition: metrics.averageTotalPosition,
+        top3Share: metrics.top3Share,
+        top10Share: metrics.top10Share,
+        points: outcome.results.map((r) => ({
+          row: r.point.row,
+          col: r.point.col,
+          lat: r.point.lat,
+          lng: r.point.lng,
+          found: r.found,
+          position: r.found ? (r.position ?? null) : null,
+        })),
+      },
+    }
   }
 
   // Radius mode: multi-point scan strategy

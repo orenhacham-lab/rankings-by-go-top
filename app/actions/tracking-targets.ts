@@ -9,7 +9,8 @@ import { actionMessages, asActionResult, type ActionMessages, type ActionResult 
 import { UserFacingError } from '@/lib/i18n/user-facing-error'
 import { geocodeAddress, validateCoordinatePair } from '@/lib/geocoding'
 import { isValidPostalCode } from '@/lib/scanner/postal-input'
-import type { ExactPointResolutionSource } from '@/lib/supabase/types'
+import { DEFAULT_GRID_SIZE, isGridSize } from '@/lib/scanner/grid-scan'
+import type { ExactPointResolutionSource, GridSize } from '@/lib/supabase/types'
 import { isAdminUser } from '@/lib/auth/admin-role'
 
 function safeStringFromFormData(formData: FormData, key: string): string | null {
@@ -17,6 +18,17 @@ function safeStringFromFormData(formData: FormData, key: string): string | null 
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   return trimmed.length > 0 ? trimmed : null
+}
+
+/**
+ * The grid's size, kept only for a grid keyword. An unknown or missing value on
+ * a grid keyword becomes the default rather than an error: the size is how many
+ * points are measured, never whether the measurement is valid.
+ */
+function gridSizeFor(locationMode: string, formData: FormData): GridSize | null {
+  if (locationMode !== 'grid') return null
+  const raw = safeStringFromFormData(formData, 'grid_size')
+  return isGridSize(raw) ? raw : DEFAULT_GRID_SIZE
 }
 
 interface ResolvedExactPoint {
@@ -178,7 +190,7 @@ export async function createTrackingTargetAction(formData: FormData) {
     notes: (formData.get('notes') as string) || null,
     location_mode: locationMode,
     custom_city: safeStringFromFormData(formData, 'custom_city'),
-    grid_size: null,
+    grid_size: gridSizeFor(locationMode, formData),
     postal_code: safeStringFromFormData(formData, 'postal_code'),
     radius_miles: radiusMiles,
     radius_center_zip: radiusCenterZip,
@@ -341,7 +353,7 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
       notes,
       location_mode: locationMode,
       custom_city: customCity,
-      grid_size: null,
+      grid_size: gridSizeFor(locationMode, formData),
       postal_code: postalCode,
       radius_miles: radiusMiles,
       radius_center_zip: radiusCenterZip,
@@ -429,7 +441,7 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
     notes: (formData.get('notes') as string) || null,
     location_mode: locationMode,
     custom_city: safeStringFromFormData(formData, 'custom_city'),
-    grid_size: null,
+    grid_size: gridSizeFor(locationMode, formData),
     postal_code: safeStringFromFormData(formData, 'postal_code'),
     radius_miles: radiusMiles,
     radius_center_zip: radiusCenterZip,
