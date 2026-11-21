@@ -48,6 +48,7 @@ const NOT_NAMED = new Set([
   // Training and customer-asked crawlers with no visitors of their own to give.
   'KimiBot', 'ElevenlabsCrawler', 'ElevenlabsBot', 'QualifiedBot',
   'ExaSearchBot-Images', 'ExaUser', 'amazon-QBusiness',
+  'Diffbot-User', 'HaikuBot', 'Haiku-SearchBot',
   'omgili', 'cohere-ai', 'Bytespider',
 ])
 
