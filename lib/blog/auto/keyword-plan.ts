@@ -492,12 +492,51 @@ export interface SelectKeywordsInput {
   /** Keywords already planned or published in this language. */
   taken: string[]
   limit: number
+  /**
+   * Queries a page of ours ALREADY holds well enough to earn from, from
+   * `lib/blog/auto/cannibal.ts` over our own Search Console rows. A candidate
+   * that lands on one of these goes to the back of the queue — see
+   * `OWNED_QUERY_PENALTY`. Optional, and an empty list means the ordering is
+   * exactly what it was before.
+   */
+  owned?: string[]
 }
 
 export interface SelectedKeyword {
   keyword: string
   monthlySearches: number | null
   competition: string | null
+}
+
+/**
+ * HOW FAR BACK A KEYWORD GOES WHEN A PAGE OF OURS ALREADY OWNS THAT QUERY.
+ *
+ * Measured 21 Nov 2026 on our own property: eight of our pages rank for
+ * "בדיקת מיקומים בגוגל" and not one of them wins; five share
+ * "בדיקת מיקום בגוגל", where the page nearest a click is a feature page at
+ * 19.6. Writing a ninth article for a query we already hold does not add a
+ * position, it divides one.
+ *
+ * It is a penalty and NOT a rejection, for the same reason the hiring-intent
+ * one is: the blog publishes every day in every language, and a check that can
+ * empty the queue is not allowed to exist. A candidate sitting on an owned
+ * query is still claimable, still counted, and still written — after the
+ * candidates that would win us a page we do not already have.
+ */
+export const OWNED_QUERY_PENALTY = 20
+
+/**
+ * How much of a keyword has to be the owned query before it is the same
+ * territory. Looser than `CANNIBAL_OVERLAP`, which decides whether two
+ * keywords are the SAME ARTICLE: being wrong here costs an article one place
+ * in the queue, not its existence.
+ */
+export const OWNED_OVERLAP = 0.6
+
+/** The penalty for a candidate that lands on a query we already hold. */
+export function ownedQueryPenalty(keyword: string, owned: string[] | undefined): number {
+  if (!owned?.length || !keyword) return 0
+  return owned.some((q) => keywordOverlap(keyword, q) >= OWNED_OVERLAP) ? OWNED_QUERY_PENALTY : 0
 }
 
 export function selectKeywords(input: SelectKeywordsInput): SelectedKeyword[] {
@@ -507,8 +546,15 @@ export function selectKeywords(input: SelectKeywordsInput): SelectedKeyword[] {
   // response can be near-duplicates of each other.
   const blocking = [...input.taken]
 
+  // The owned-query penalty is applied HERE and not inside `keywordDifficulty`
+  // on purpose: `planRowDifficulty` shares that function, and a row already in
+  // the queue should not be reordered by a reading taken after it was planned.
+  // This changes which NEW keywords are researched in, nothing else.
+  const score = (idea: KeywordIdeaResult): number =>
+    keywordDifficulty(idea, input.locale) + ownedQueryPenalty(idea.keyword ?? '', input.owned)
+
   const ranked = [...input.ideas].sort((a, b) => {
-    const d = keywordDifficulty(a, input.locale) - keywordDifficulty(b, input.locale)
+    const d = score(a) - score(b)
     if (d !== 0) return d
     return (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0)
   })
