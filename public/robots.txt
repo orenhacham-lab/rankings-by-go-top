@@ -87,6 +87,8 @@ User-agent: Amzn-User
 User-agent: MistralAI-Index
 User-agent: MistralAI-User
 User-agent: DuckAssistBot
+User-agent: Kimi-SearchBot
+User-agent: Kimi-User
 User-agent: CCBot
 Allow: /
 Disallow: /admin
