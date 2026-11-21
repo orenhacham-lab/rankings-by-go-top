@@ -86,6 +86,10 @@ export const getPublicArticle = cache(async (slug: string, locale: PublicLocale)
  * per entry. The heading text is per language, so the Hebrew-only match this
  * replaces found nothing in a Spanish article and silently emitted no FAQ.
  */
+/** A question or an answer as a reader hears it: the words, without the markup. */
+const plainText = (html: string): string =>
+  (html || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+
 export function extractFaqSchema(content: string, locale: PublicLocale): Array<{ '@type': string; name: string; acceptedAnswer: { '@type': string; text: string } }> {
   const faqSchema: Array<{ '@type': string; name: string; acceptedAnswer: { '@type': string; text: string } }> = []
 
@@ -96,13 +100,20 @@ export function extractFaqSchema(content: string, locale: PublicLocale): Array<{
 
   const faqContent = faqSectionMatch[1]
 
-  // Match each <p> containing <strong>question</strong><br>answer
-  const pRegex = /<p[^>]*>\s*<strong[^>]*>([^<]+)<\/strong>\s*<br\s*\/?>\s*([^<]+)<\/p>/gi
+  // Match each <p> containing <strong>question</strong><br>answer.
+  //
+  // Both captures run to their closing tag and are then stripped of markup,
+  // rather than being "characters that are not `<`". The strict version lost a
+  // whole entry the moment anything inline appeared inside the answer — and
+  // things do appear there: `linkifyBareUrls` turns an address in an answer
+  // into a link, and `withProductLinks` can link a term the answer used. The
+  // entry did not degrade, it vanished, and with it the FAQ rich result.
+  const pRegex = /<p[^>]*>\s*<strong[^>]*>([\s\S]*?)<\/strong>\s*<br\s*\/?>\s*([\s\S]*?)<\/p>/gi
   let match
 
   while ((match = pRegex.exec(faqContent)) !== null) {
-    const question = match[1]?.trim()
-    const answer = match[2]?.trim()
+    const question = plainText(match[1])
+    const answer = plainText(match[2])
 
     if (question && answer) {
       faqSchema.push({

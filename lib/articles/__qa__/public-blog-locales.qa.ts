@@ -466,8 +466,14 @@ function main() {
     return out.includes('rel="nofollow noopener"') && out.includes('target="_blank"')
   })())
   check('T6. running it twice changes nothing', linkifyBareUrls(bareOut) === bareOut)
-  check('T7. the article page runs it on the stored body, after the sanitizer, and repairs the links it finds',
-    /withHeadingIds\(repairBodyLinks\(linkifyBareUrls\(sanitizePublicArticleHtml\(article\.content\)\)\)\)/.test(stripComments(read('components/public/articles/ArticleView.tsx'))))
+  // The chain, in order: sanitize the stored body, link the addresses that
+  // could be real, link the terms the article used for our own pages, then
+  // re-ask every link for its attributes, then add the heading ids. Running it
+  // at render is what gives the 221 articles published before these passes
+  // their links with no write to the database.
+  check('T7. the article page runs the whole chain on the stored body, in that order',
+    /withHeadingIds\(\s*repairBodyLinks\(withProductLinks\(linkifyBareUrls\(sanitizePublicArticleHtml\(article\.content\)\), locale\)\),?\s*\)/
+      .test(stripComments(read('components/public/articles/ArticleView.tsx'))))
   check('T8. headings still get their ids through it', withHeadingIds(bareOut).headings.length === 1)
 
   console.log('\nM. mutation controls — the behavioural guards fail on broken input')

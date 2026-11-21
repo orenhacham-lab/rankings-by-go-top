@@ -29,6 +29,7 @@ import { authHref } from '@/lib/i18n/auth-href'
 import {
   blockOfRun, isLinkableRun, isOwnUrl, linkifyBareUrls, repairBodyLinks, textRuns, tokenizeHtml,
 } from '@/lib/articles/bare-urls'
+import { withProductLinks } from '@/lib/articles/product-links'
 import type { BlogAutoLocale } from '@/lib/blog/auto/rotation'
 import { articlePath, type InternalLinkTarget } from '@/lib/blog/auto/brief'
 
@@ -212,7 +213,12 @@ export function withBodyLinks(
   // that never named us gets the one deterministic sentence that does.
   const named = ensureBrandSentence(canonicalizeBrand(linkified), input.locale)
   const branded = linkBrandMention(named, input.locale)
-  const related = relatedReading(branded, input.locale, input.internalTargets)
+  // The pages that answer a buying question, linked from the words the article
+  // already used for them. Adds no sentence, so it cannot fail a gate; measured
+  // before this landed: 0 of 221 published articles linked to /compare/*,
+  // /free-check or /ai-crawlers (lib/articles/product-links.ts).
+  const toProduct = withProductLinks(branded, input.locale)
+  const related = relatedReading(toProduct, input.locale, input.internalTargets)
   // Last: every link in the finished body is re-asked. It can only drop an
   // anchor or correct an attribute, so it cannot make the article fail a gate —
   // `checkBodyLinks` has already run on the body it leaves alone.

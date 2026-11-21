@@ -17,6 +17,7 @@ import { authorDisplayName, authorInitial } from '@/lib/articles/authors'
 import { getPublicArticle } from '@/lib/articles/server'
 import { withHeadingIds } from '@/lib/articles/headings'
 import { linkifyBareUrls, repairBodyLinks } from '@/lib/articles/bare-urls'
+import { withProductLinks } from '@/lib/articles/product-links'
 import { splitArticleBlocks } from '@/lib/articles/widgets'
 import { readingMinutes } from '@/lib/articles/reading-time'
 import { resolveBillingMarket } from '@/lib/billing/server-market'
@@ -94,7 +95,14 @@ export async function ArticleView({ locale, slug }: { locale: PublicLocale; slug
   // (repairBodyLinks): a link to an address that cannot exist loses the anchor
   // and keeps its words, and a link to somebody else's site gets its
   // rel="nofollow". Both repair the pages that are live without a data change.
-  const { html, headings } = withHeadingIds(repairBodyLinks(linkifyBareUrls(sanitizePublicArticleHtml(article.content))))
+  // The same three passes the publisher runs, run again here, so the 221
+  // articles published before them gain their links with no write to the
+  // database: a bare address is linked only when it could be real, a term the
+  // article used for one of our pages becomes a link to that page, and every
+  // link is re-asked for its attributes.
+  const { html, headings } = withHeadingIds(
+    repairBodyLinks(withProductLinks(linkifyBareUrls(sanitizePublicArticleHtml(article.content)), locale)),
+  )
   const blocks = splitArticleBlocks(html)
   const hasCta = blocks.some((b) => b.kind === 'widget' && b.widget === 'cta')
   // The index the author box is rendered at: just before a closing call to
