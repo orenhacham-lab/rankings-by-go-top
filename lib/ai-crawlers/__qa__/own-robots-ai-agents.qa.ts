@@ -57,7 +57,7 @@ const MUST_NAME = [
   'Google-Extended', 'GoogleOther',
   'PerplexityBot', 'Perplexity-User',
   'Applebot', 'Applebot-Extended',
-  'Meta-ExternalAgent', 'Amazonbot',
+  'Meta-ExternalAgent', 'Amazonbot', 'Amzn-SearchBot', 'Amzn-User',
   'MistralAI-Index', 'MistralAI-User', 'DuckAssistBot', 'CCBot',
 ]
 for (const token of MUST_NAME) {
