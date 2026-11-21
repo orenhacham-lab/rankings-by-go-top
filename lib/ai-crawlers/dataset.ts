@@ -109,6 +109,10 @@ const AMAZON_DOCS = 'https://developer.amazon.com/amazonbot'
 const KIMI_DOCS = 'https://kimi.com/policies/kimi-crawlers'
 const ELEVENLABS_DOCS = 'https://elevenlabs.io/docs/bots'
 const QUALIFIED_DOCS = 'https://qualified.com/legal/qualified-crawler-user-agent'
+const EXA_DOCS = 'https://crawler.exa.ai/'
+const LINER_DOCS = 'https://liner-user.liner.com/docs/liner-user'
+const AMAZON_Q_DOCS =
+  'https://docs.aws.amazon.com/amazonq/latest/qbusiness-ug/stop-web-crawler.html'
 
 /** Every row read on this date, from the `docs` page named on the row. */
 // 04.11.2026: the Google, Perplexity and Meta pages had all been moved and
@@ -161,6 +165,18 @@ const READ_ON_NOV20 = '2026-11-20'
 // its page documents the token and the crawl, and says to control the schedule
 // by contacting your account manager — robots.txt is never mentioned, so the
 // row says it has committed to nothing rather than inventing a commitment.
+// 21.11.2026, third pass: Exa, Liner and Amazon Q Business, found the same way
+// and read the same way — only at the operator's own page. Two things here are
+// worth more than the six rows. First, Liner documents that its user-triggered
+// fetcher follows the robots.txt group naming its token. Several answer-time
+// fetchers here honour robots.txt (Claude-User, ChatGPT-User, MistralAI-User,
+// DuckAssistBot), but of the operators that raise being user-initiated at all,
+// Liner is the one that commits rather than reserving the right to ignore it. Second, Exa and
+// Liner both sign their requests under Web Bot Auth (RFC 9421) and publish key
+// directories, which is how a site will increasingly tell a real crawler from
+// a spoofed user agent. Grok was chased again: x.ai/bot now answers 200, but
+// it is a product page for AI teammates and names no robots.txt token, so
+// there is still nothing to document.
 const READ_ON_NOV21 = '2026-11-21'
 
 export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
@@ -361,6 +377,16 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
     note: 'The fetch Amazon makes while a person waits \u2014 it brings live information from the web to answer an Alexa question on that user\u2019s behalf. Amazon states that because the action can be initiated by a user it may not follow all robots.txt directives, and that it does not crawl content for generative AI model training.',
   },
   {
+    token: 'amazon-QBusiness',
+    operator: 'Amazon',
+    purpose: 'search',
+    crawls: true,
+    respectsRobots: true,
+    docs: AMAZON_Q_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'The crawler an Amazon Q Business customer points at websites to index them for their own assistant, so a site usually meets it because somebody using that site configured it. AWS documents that it adheres to robots.txt and respects Allow and Disallow, and writes the token in lower case in its own examples. The same page states that Q Business is no longer open to new customers.',
+  },
+  {
     token: 'Bingbot',
     operator: 'Microsoft',
     purpose: 'search',
@@ -437,6 +463,60 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
     note: 'The fetch made when somebody asks Kimi to read a page or answer something that needs live retrieval. Moonshot states that it is not used for bulk crawling and that, because the actions are user-triggered, robots.txt rules may not directly apply \u2014 and separately that disallowing it may reduce a site\u2019s visibility in user-directed searches through its products. Moonshot also asks sites not to block its IP ranges, because a blocked crawler cannot read the robots.txt that states the site\u2019s preferences.',
   },
 
+  // ── Exa ───────────────────────────────────────────────────────────────────
+  {
+    token: 'ExaSearchBot',
+    operator: 'Exa',
+    purpose: 'search',
+    crawls: true,
+    respectsRobots: true,
+    docs: EXA_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'Builds the index that Exa search and the applications on top of it answer from, and Exa states that it sends people back to the source. Its robots.txt precedence is unusual and worth knowing: with no group naming ExaSearchBot it follows the rules set for major search engines, and only then the * group. Exa also documents that robots.txt governs crawling and not indexing \u2014 a page already in the index leaves it on a noindex meta tag or X-Robots-Tag header, at the next re-fetch \u2014 and that every request is signed under Web Bot Auth (RFC 9421), with Ed25519 keys published at crawler.exa.ai, so the user agent alone should not be trusted.',
+  },
+  {
+    token: 'ExaSearchBot-Images',
+    operator: 'Exa',
+    purpose: 'search',
+    crawls: true,
+    respectsRobots: true,
+    docs: EXA_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'The same crawler fetching images, under its own token, so a site can keep its pages in the index and keep its images out of it.',
+  },
+  {
+    token: 'ExaUser',
+    operator: 'Exa',
+    purpose: 'answer',
+    crawls: true,
+    respectsRobots: false,
+    docs: EXA_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'The pages Exa fetches on one user\u2019s request rather than by crawling. Exa\u2019s page names the token and separates it from the crawler, but its robots.txt section is written about ExaSearchBot alone and promises nothing for this one, which is why this row states no commitment rather than borrowing the crawler\u2019s.',
+  },
+
+  // ── Liner ─────────────────────────────────────────────────────────────────
+  {
+    token: 'LinerBot',
+    operator: 'Liner',
+    purpose: 'search',
+    crawls: true,
+    respectsRobots: true,
+    docs: LINER_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'Builds and refreshes Liner\u2019s search and reference index, including paper metadata, citations and DOI resolution. Liner documents that each of its two bots follows the group naming its own token and the * group otherwise, and that rules for this one do not apply to the other.',
+  },
+  {
+    token: 'Liner-User',
+    operator: 'Liner',
+    purpose: 'answer',
+    crawls: true,
+    respectsRobots: true,
+    docs: LINER_DOCS,
+    verified: READ_ON_NOV21,
+    note: 'Fetches a page in real time when a Liner user asks a question, and the answer cites that page as its source. Unlike the fetchers whose operators lean on the fetch being user-initiated to say robots.txt may not apply \u2014 Perplexity-User, Meta-ExternalFetcher, Kimi-User, ExaUser, Amzn-User and Google\u2019s user-triggered fetchers \u2014 Liner commits to the file anyway: it documents that this bot follows the group naming Liner-User, and the * group when none does. Both Liner bots sign their requests under Web Bot Auth with separate keys, and Liner states it publishes no IP ranges, so the signature is the only verification offered.',
+  },
+
   // ── ElevenLabs ────────────────────────────────────────────────────────────
   {
     token: 'ElevenlabsCrawler',
@@ -484,25 +564,25 @@ export const AI_CRAWLER_CANDIDATES: readonly DatasetCandidate[] = [
     token: 'Bytespider',
     operator: 'ByteDance',
     purpose: 'train',
-    whyHere: 'Widely seen in access logs and widely reported to ignore robots.txt, but no operator-published page naming the token was found on 2026-11-01.',
+    whyHere: 'Widely seen in access logs and widely reported to ignore robots.txt. Re-checked on 2026-11-21: ByteDance still publishes no page naming the token.',
   },
   {
     token: 'cohere-ai',
     operator: 'Cohere',
     purpose: 'train',
-    whyHere: 'Seen in logs and in other lists; no current operator page naming the token was found on 2026-11-01.',
+    whyHere: 'Seen in logs and in other lists. Re-checked on 2026-11-21: Cohere still publishes no page naming the token.',
   },
   {
     token: 'Timpibot',
     operator: 'Timpi',
     purpose: 'train',
-    whyHere: 'No operator documentation found on 2026-11-01.',
+    whyHere: 'No operator documentation found, re-checked on 2026-11-21.',
   },
   {
     token: 'omgili',
     operator: 'Webz.io',
     purpose: 'train',
-    whyHere: 'No current operator documentation found on 2026-11-01.',
+    whyHere: 'Re-checked on 2026-11-21: webz.io answers 403 to our requests, so we can neither read a page naming the token nor state that none exists. Either way there is nothing cited to promote this row on.',
   },
 ] as const
 

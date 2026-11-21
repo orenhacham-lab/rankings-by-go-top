@@ -47,6 +47,7 @@ const NOT_NAMED = new Set([
   'MistralAI-Training', 'Kagibot', 'AI2Bot', 'Diffbot', 'ImagesiftBot', 'Timpibot',
   // Training and customer-asked crawlers with no visitors of their own to give.
   'KimiBot', 'ElevenlabsCrawler', 'ElevenlabsBot', 'QualifiedBot',
+  'ExaSearchBot-Images', 'ExaUser', 'amazon-QBusiness',
   'omgili', 'cohere-ai', 'Bytespider',
 ])
 
@@ -61,7 +62,7 @@ const MUST_NAME = [
   'Applebot', 'Applebot-Extended',
   'Meta-ExternalAgent', 'Amazonbot', 'Amzn-SearchBot', 'Amzn-User',
   'MistralAI-Index', 'MistralAI-User', 'DuckAssistBot', 'CCBot',
-  'Kimi-SearchBot', 'Kimi-User',
+  'Kimi-SearchBot', 'Kimi-User', 'ExaSearchBot', 'LinerBot', 'Liner-User',
 ]
 for (const token of MUST_NAME) {
   check(`A1 named: ${token}`, named.has(token.toLowerCase()))

@@ -18,14 +18,33 @@
  * that was already deployed. Building them produces a second copy of an output
  * that already exists.
  *
- * WHAT IT SKIPS. Only a PREVIEW build whose tree is identical to the tree of the
- * last successful deployment of the same branch. Nothing else:
+ * WHAT IT SKIPS. Two kinds of PREVIEW build, both measured against the last
+ * successful deployment of the same branch:
+ *   1. a tree identical to that deployment's tree (the empty merge above);
+ *   2. a diff that touches only files which never reach a deployment at all —
+ *      QA suites, probe SQL, the QA runner, GitHub workflows and documentation.
+ * Nothing else:
  *   - production always builds, so `main` stays one deployment per commit and a
  *     "is my merge live" check can keep reading list_deployments by sha;
  *   - a branch's first deployment always builds (there is no previous sha yet);
  *   - anything this script cannot determine builds. Every unknown fails OPEN,
  *     because a redundant build costs storage while a missing one costs a
  *     deployment somebody is waiting for.
+ *
+ * WHY (2), ADDED 21 NOVEMBER 2026. Four days of Pro billing came to $4.49, and
+ * the single largest line was Build CPU Minutes at $1.02 — more than Active CPU,
+ * memory, invocations and bandwidth together ($0.32). The pass gate fixed the
+ * runtime; what costs money now is BUILDS, and builds come from pushes. Oren
+ * intends to leave Pro at the end of the paid period and stay off it, so the
+ * build count has to come down in the code rather than in somebody's habits. A
+ * push that only adds a QA suite or rewrites a comment produces a preview whose
+ * deployed output is byte-for-byte the previous one; building it buys nothing.
+ *
+ * `content/**` IS DEPLOYED, markdown included: the legal pages read
+ * content/legal/<locale>/*.md at request time (see outputFileTracingIncludes in
+ * next.config.ts). So markdown is irrelevant to a build ONLY outside content/.
+ * Getting that backwards would stop a legal-text correction from ever going
+ * live, which is why it is a named case in the QA suite.
  *
  * Node builtins only, and no imports outside them: the Ignored Build Step runs
  * BEFORE the install step, so node_modules does not exist yet.
@@ -37,13 +56,40 @@ import { execFileSync } from 'node:child_process'
  * `build: true` means Vercel must build.
  */
 export function decide(input) {
-  const { vercelEnv, previousSha, previousTree, headTree } = input
+  const { vercelEnv, previousSha, previousTree, headTree, changedPaths } = input
   if (vercelEnv !== 'preview') return { build: true, reason: `target is ${vercelEnv || 'unknown'}, not preview` }
   if (!previousSha) return { build: true, reason: 'no previous successful deployment on this branch' }
   if (!previousTree) return { build: true, reason: `tree of previous deployment ${previousSha} is not in this clone` }
   if (!headTree) return { build: true, reason: 'the tree of HEAD could not be read' }
   if (previousTree === headTree) return { build: false, reason: `tree ${headTree} is already deployed as ${previousSha}` }
-  return { build: true, reason: 'the tree changed since the last deployment of this branch' }
+  if (!Array.isArray(changedPaths) || changedPaths.length === 0) {
+    return { build: true, reason: 'the tree changed and the changed paths could not be listed' }
+  }
+  const deployed = changedPaths.filter((path) => !isBuildIrrelevant(path))
+  if (deployed.length === 0) {
+    return { build: false, reason: `${changedPaths.length} changed file(s), none of which reach a deployment` }
+  }
+  return { build: true, reason: `${deployed.length} deployed file(s) changed, starting with ${deployed[0]}` }
+}
+
+/**
+ * True when a path cannot change what a deployment serves.
+ *
+ * Deliberately a closed list of shapes rather than a guess about each file: an
+ * unrecognised path is treated as deployed, so a new kind of file builds until
+ * somebody adds it here on purpose.
+ */
+export function isBuildIrrelevant(path) {
+  if (typeof path !== 'string' || path.length === 0) return false
+  // The legal pages read content/legal/<locale>/*.md at request time, so
+  // nothing under content/ is ever irrelevant, markdown included.
+  if (path === 'content' || path.startsWith('content/')) return false
+  if (path.includes('__qa__/')) return true
+  if (path.endsWith('.qa.ts') || path.endsWith('.probe.sql')) return true
+  if (path.startsWith('scripts/qa/')) return true
+  if (path.startsWith('.github/')) return true
+  if (path.endsWith('.md')) return true
+  return false
 }
 
 const git = (args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
@@ -67,6 +113,19 @@ function fetchCommit(sha) {
   }
 }
 
+/**
+ * The files that differ between the previous deployment and HEAD, or null when
+ * this clone cannot answer — which builds.
+ */
+function changedPathsSince(sha) {
+  try {
+    const out = git(['diff', '--name-only', `${sha}`, 'HEAD'])
+    return out ? out.split('\n').map((line) => line.trim()).filter(Boolean) : null
+  } catch {
+    return null
+  }
+}
+
 function main() {
   const vercelEnv = process.env.VERCEL_ENV
   const previousSha = process.env.VERCEL_GIT_PREVIOUS_SHA
@@ -77,7 +136,13 @@ function main() {
     previousTree = treeOf(previousSha)
     if (!previousTree && fetchCommit(previousSha)) previousTree = treeOf(previousSha)
   }
-  const verdict = decide({ vercelEnv, previousSha, previousTree, headTree: treeOf('HEAD') })
+  const verdict = decide({
+    vercelEnv,
+    previousSha,
+    previousTree,
+    headTree: treeOf('HEAD'),
+    changedPaths: previousTree ? changedPathsSince(previousSha) : null,
+  })
   console.log(`${verdict.build ? 'BUILD' : 'SKIP'}: ${verdict.reason}`)
   process.exit(verdict.build ? 1 : 0)
 }

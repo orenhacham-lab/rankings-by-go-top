@@ -77,14 +77,36 @@ export interface BlogAutoSummary {
   dryRun: boolean
 }
 
+/**
+ * The queries a page of ours already holds, for the research ordering.
+ *
+ * IT MAY NEVER STOP THE TOP-UP. The queue growing is what keeps every
+ * language publishing every day; an ordering hint is not worth a language
+ * running out of topics, so every failure here — no sync, no rows, a database
+ * error — answers with an empty list and the selection is ordered exactly as
+ * it was before this existed.
+ */
+async function readOwnedQueries(admin: Admin): Promise<string[]> {
+  try {
+    const [{ readOwnSearchRows }, { cannibalTable, ownedQueries }] = await Promise.all([
+      import('@/lib/blog/auto/own-search'), import('@/lib/blog/auto/cannibal'),
+    ])
+    const reading = await readOwnSearchRows(admin)
+    if (!reading?.rows.length) return []
+    return ownedQueries(cannibalTable(reading.rows))
+  } catch {
+    return []
+  }
+}
+
 /** Research + queue top-up for one language, when it is running low. */
 async function topUp(admin: Admin, locale: BlogAutoLocale, summary: BlogAutoSummary): Promise<void> {
   if (summary.planned >= TOPUP_FLOOR) return
   const { ideas, error } = await researchKeywords(locale)
   summary.topUpError = error
   if (!ideas.length) return
-  const taken = await readTakenKeywords(admin, locale)
-  const chosen = selectKeywords({ locale, ideas, taken, limit: TOPUP_BATCH })
+  const [taken, owned] = await Promise.all([readTakenKeywords(admin, locale), readOwnedQueries(admin)])
+  const chosen = selectKeywords({ locale, ideas, taken, limit: TOPUP_BATCH, owned })
   summary.topUpAdded = await addPlanRows(admin, locale, chosen)
   summary.planned = await countPlanned(admin, locale)
 }
