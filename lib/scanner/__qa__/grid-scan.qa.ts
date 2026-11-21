@@ -36,12 +36,18 @@ const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol
 // ------------------------------------------------- A. sizes match the schema
 console.log('\nA. The sizes are the ones the database already allows')
 {
-  const migration = readFileSync('supabase/migrations/20260421_add_location_mode_to_targets.sql', 'utf8')
+  // The database CHECK constraint from that migration is gone in production
+  // (measured 21.11.2026), so the type in lib/supabase/types.ts is the only
+  // contract left. A size that is not in it must not exist here.
+  const dbTypes = readFileSync('lib/supabase/types.ts', 'utf8')
+  const declared = /export type GridSize = ([^\n]+)/.exec(dbTypes)?.[1] ?? ''
   for (const size of Object.keys(GRID_DIMENSIONS) as GridSize[]) {
-    check(`the migration permits '${size}'`, migration.includes(`'${size}'`))
+    check(`the stored GridSize type carries '${size}'`, declared.includes(`'${size}'`), declared)
   }
-  check('no size exists that the migration does not permit',
-    Object.keys(GRID_DIMENSIONS).every((s) => migration.includes(`'${s}'`)))
+  check('the stored type has no size this module does not implement',
+    (declared.match(/'[a-z]+'/g) ?? []).every((q) => q.slice(1, -1) in GRID_DIMENSIONS), declared)
+  check('the migration that created the column is still the historical record',
+    readFileSync('supabase/migrations/20260421_add_location_mode_to_targets.sql', 'utf8').includes("'grid'"))
   check('every side is odd, so a true centre exists',
     Object.values(GRID_DIMENSIONS).every((n) => n % 2 === 1), JSON.stringify(GRID_DIMENSIONS))
   check('5x5 = 25, 7x7 = 49, 9x9 = 81 searches',

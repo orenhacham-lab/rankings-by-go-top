@@ -24,8 +24,18 @@
  * keyword list.
  */
 
-/** The sizes `tracking_targets.grid_size` already permits. */
-export type GridSize = 'small' | 'medium' | 'large'
+/**
+ * The sizes `tracking_targets.grid_size` was built for. The column and its
+ * three values have existed since the 2026-04-21 migration, which also listed
+ * `'grid'` as a location mode; both were then left unused, every insert writing
+ * null. Measured in production on 21.11.2026: the CHECK constraints from that
+ * migration are NO LONGER on the table (they were dropped when `zip`,
+ * `exact_point` and `radius` were added and never restored), so nothing at the
+ * database level rejects a bad value. This type is the contract instead, which
+ * is why it is imported from one place rather than written out twice.
+ */
+export type { GridSize } from '../supabase/types'
+import type { GridSize } from '../supabase/types'
 
 /** Points per side. Always odd, so there is a true centre point. */
 export const GRID_DIMENSIONS: Record<GridSize, number> = {
