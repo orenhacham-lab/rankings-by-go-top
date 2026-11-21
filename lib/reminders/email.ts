@@ -12,7 +12,7 @@
  */
 import { escapeEmailHtml } from '@/lib/notifications/signup-email'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { toBilingualLocale, type Locale, type PublicLocale } from '@/lib/i18n/locales'
+import { type PublicLocale } from '@/lib/i18n/locales'
 
 /** How many titles the email lists before "(and k more)". */
 export const TITLES_SHOWN = 3
@@ -74,7 +74,14 @@ export function reviewUrlFor(origin: string, locale: PublicLocale): string {
  */
 export const SETUP_UNSUBSCRIBE_SCOPE = 'setup'
 
-export function unsubscribeUrlFor(origin: string, token: string, locale: Locale, scope?: string): string {
+/**
+ * THE LANGUAGE OF THE LINK. This used to be narrowed through
+ * `toBilingualLocale`, so an Italian customer read an Italian email and then
+ * met an ENGLISH unsubscribe page — the one page where a customer is already
+ * unhappy. The page's own copy has existed in all eleven languages the whole
+ * time (reminders.unsubscribePage); only the link threw the language away.
+ */
+export function unsubscribeUrlFor(origin: string, token: string, locale: PublicLocale, scope?: string): string {
   const narrow = scope ? `&s=${encodeURIComponent(scope)}` : ''
   return `${origin}${UNSUBSCRIBE_PATH}?t=${encodeURIComponent(token)}&lang=${locale}${narrow}`
 }
@@ -90,7 +97,7 @@ export function buildReminderEmail(input: ReminderEmailInput): ReminderEmail {
   const reviewUrl = reviewUrlFor(input.origin, input.locale)
   // The unsubscribe PAGE is bilingual, so the link narrows once, here, exactly
   // as the setup emails and the weekly summary narrow it.
-  const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, toBilingualLocale(input.locale))
+  const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, input.locale)
   const subject = t.subject(input.total, input.domain)
   const greeting = t.greeting(input.firstName)
   const intro = t.intro(input.total, input.domain)

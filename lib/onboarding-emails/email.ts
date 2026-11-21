@@ -21,7 +21,6 @@
 import { escapeEmailHtml } from '@/lib/notifications/signup-email'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { SETUP_UNSUBSCRIBE_SCOPE, unsubscribeUrlFor } from '@/lib/reminders/email'
-import { toBilingualLocale } from '@/lib/i18n/locales'
 import { PROJECT_CONNECTION_ANCHOR } from '@/lib/content/content-hub-setup'
 import { koreaAdSubject } from '@/lib/compliance/korea-promotional-email'
 import type { PublicLocale } from '@/lib/i18n/locales'
@@ -80,7 +79,7 @@ export function buildOnboardingEmail(input: OnboardingEmailInput): OnboardingEma
   const actionUrl = actionUrlFor(input.origin, input.stage, input.projectId, input.locale)
   // The unsubscribe page is bilingual (lib/reminders/http.ts): Spanish and Portuguese
   // readers get its English, which is the same narrowing the rest of the dashboard makes.
-  const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, toBilingualLocale(input.locale), SETUP_UNSUBSCRIBE_SCOPE)
+  const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, input.locale, SETUP_UNSUBSCRIBE_SCOPE)
   const subject = input.markAsKoreanAd ? koreaAdSubject(s.subject(input.domain)) : s.subject(input.domain)
   const greeting = t.greeting(input.firstName)
   const intro = s.intro(input.domain)
