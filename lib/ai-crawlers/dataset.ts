@@ -168,9 +168,10 @@ const READ_ON_NOV20 = '2026-11-20'
 // 21.11.2026, third pass: Exa, Liner and Amazon Q Business, found the same way
 // and read the same way — only at the operator's own page. Two things here are
 // worth more than the six rows. First, Liner documents that its user-triggered
-// fetcher follows the robots.txt group naming its token, which every other
-// answer-time fetcher in this dataset explicitly declines to promise, so
-// `respectsRobots: true` on Liner-User is not an oversight. Second, Exa and
+// fetcher follows the robots.txt group naming its token. Several answer-time
+// fetchers here honour robots.txt (Claude-User, ChatGPT-User, MistralAI-User,
+// DuckAssistBot), but of the operators that raise being user-initiated at all,
+// Liner is the one that commits rather than reserving the right to ignore it. Second, Exa and
 // Liner both sign their requests under Web Bot Auth (RFC 9421) and publish key
 // directories, which is how a site will increasingly tell a real crawler from
 // a spoofed user agent. Grok was chased again: x.ai/bot now answers 200, but
@@ -513,7 +514,7 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
     respectsRobots: true,
     docs: LINER_DOCS,
     verified: READ_ON_NOV21,
-    note: 'Fetches a page in real time when a Liner user asks a question, and the answer cites that page as its source. It is the one answer-time fetcher in this dataset whose operator does commit to robots.txt: Liner documents that it follows the group naming Liner-User, and the * group when none does. Both Liner bots sign their requests under Web Bot Auth with separate keys, and Liner states it publishes no IP ranges, so the signature is the only verification offered.',
+    note: 'Fetches a page in real time when a Liner user asks a question, and the answer cites that page as its source. Unlike the fetchers whose operators lean on the fetch being user-initiated to say robots.txt may not apply \u2014 Perplexity-User, Meta-ExternalFetcher, Kimi-User, ExaUser, Amzn-User and Google\u2019s user-triggered fetchers \u2014 Liner commits to the file anyway: it documents that this bot follows the group naming Liner-User, and the * group when none does. Both Liner bots sign their requests under Web Bot Auth with separate keys, and Liner states it publishes no IP ranges, so the signature is the only verification offered.',
   },
 
   // ── ElevenLabs ────────────────────────────────────────────────────────────
