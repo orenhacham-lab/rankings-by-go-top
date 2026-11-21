@@ -321,10 +321,28 @@ async function main() {
       const v = verdict(text)
       check(`G: ${lang} — the contrast publishes`, !v.failures.includes('ai_engine_coverage_claim'), v.failures.join(','))
     }
+    // THE THIRD SHAPE, measured 21 Nov 2026: the English article lost its day on
+    // a sentence that neither denies nor says "on request" — it draws the line by
+    // HOW MUCH is covered, one question at a time.
+    const perQuestion: [string, string][] = [
+      ['English, 21 Nov', 'Our platform checks ChatGPT, Gemini and Google AI automatically, while offering single-question checks for Perplexity, Copilot, and Grok from our menu.'],
+      ['English, one-off', 'The automatic check covers ChatGPT, Gemini and Google AI; Perplexity and Grok are one-off checks.'],
+      ['Italian', 'Il controllo automatico copre ChatGPT, Gemini e Google AI, con verifiche singole per Perplexity.'],
+      ['German', 'Die Prüfung läuft automatisch für ChatGPT, Gemini und Google AI; für Grok gibt es eine Einzelabfrage.'],
+      ['Polish', 'Sprawdzanie automatyczne obejmuje ChatGPT, Gemini i Google AI, a dla Perplexity dostępne są pojedyncze zapytania.'],
+      ['Hebrew', 'הבדיקה האוטומטית מכסה את ChatGPT, Gemini ו-Google AI, ועבור Perplexity יש בדיקה בודדת.'],
+    ]
+    for (const [lang, text] of perQuestion) {
+      const v = verdict(text)
+      check(`G: ${lang} — the per-question line publishes`, !v.failures.includes('ai_engine_coverage_claim'), v.failures.join(','))
+    }
+
     // The claim stays refused even where the word "automatically" is far away.
     check('G: and claiming the automatic check includes it is still refused',
       verdict('Il controllo automatico include Perplexity, Copilot e Grok.').failures.includes('ai_engine_coverage_claim'))
 
+    // MUTATION CONTROL — dropping PER_QUESTION from claimsEngineCoverage fails
+    // every "per-question line publishes" row above, which is the 21 Nov defect.
     // MUTATION CONTROL — the rule as it stood on 18 Nov: negation only.
     const OLD = (sentence: string) =>
       /perplexity|copilot|grok/i.test(sentence)
