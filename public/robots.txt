@@ -89,6 +89,9 @@ User-agent: MistralAI-User
 User-agent: DuckAssistBot
 User-agent: Kimi-SearchBot
 User-agent: Kimi-User
+User-agent: ExaSearchBot
+User-agent: LinerBot
+User-agent: Liner-User
 User-agent: CCBot
 Allow: /
 Disallow: /admin
