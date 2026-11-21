@@ -16,6 +16,7 @@
  * and project/keyword/AI-prompt enforcement.
  */
 
+import { DEFAULT_GRID_SIZE, gridPointCount, isGridSize } from '@/lib/scanner/grid-scan'
 import type { PlanLimits, PlanType } from '@/lib/subscription'
 import { UserFacingError } from '@/lib/i18n/user-facing-error'
 
@@ -119,6 +120,58 @@ export async function countActiveTargets(
     .eq('project_id', projectId)
     .eq('is_active', true)
   return count ?? 0
+}
+
+/**
+ * HOW MANY PROVIDER CHECKS ONE KEYWORD COSTS.
+ *
+ * Most keywords cost one: one Serper request, one check off the allowance. Two
+ * location modes cost more, because they measure the same keyword from several
+ * places:
+ *   - RADIUS is nine requests (centre plus eight compass points), and it has
+ *     always been counted as ONE. That is a measured defect, not a decision:
+ *     lib/scanner/radius-scan.ts has made nine provider calls per radius check
+ *     since the mode shipped, while reserveUsage was told `amount: 1`. A
+ *     customer on radius has been spending nine times what their allowance was
+ *     debited, which is our cost, not theirs.
+ *   - GRID is the square: 25, 49 or 81 requests.
+ *
+ * Counting them honestly is what makes a grid affordable to offer. The grid is
+ * not free; it costs the customer the checks it actually spends, and their plan
+ * allowance is what limits it. Nothing about the prices changes.
+ */
+export const RADIUS_PROVIDER_CHECKS = 9
+
+export type TargetCheckShape = {
+  location_mode?: string | null
+  grid_size?: string | null
+}
+
+export function providerChecksForTarget(target: TargetCheckShape): number {
+  if (target.location_mode === 'grid') {
+    return gridPointCount(isGridSize(target.grid_size) ? target.grid_size : DEFAULT_GRID_SIZE)
+  }
+  if (target.location_mode === 'radius') return RADIUS_PROVIDER_CHECKS
+  return 1
+}
+
+/**
+ * The checks a whole-project scan will actually spend, which is what must be
+ * reserved before it starts. `countActiveTargets` counts KEYWORDS and is kept
+ * for the places that mean keywords; this counts CHECKS.
+ */
+export async function countPlannedChecks(
+  projectId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
+): Promise<number> {
+  const { data } = await supabase
+    .from('tracking_targets')
+    .select('location_mode, grid_size')
+    .eq('project_id', projectId)
+    .eq('is_active', true)
+  if (!Array.isArray(data)) return 0
+  return (data as TargetCheckShape[]).reduce((sum, t) => sum + providerChecksForTarget(t), 0)
 }
 
 /**

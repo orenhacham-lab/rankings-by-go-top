@@ -188,8 +188,15 @@ async function main() {
       /[֐-׿]/.test(he.subject) && /dir="rtl"/.test(he.html))
     check('E4: the link opens the app in the email’s own language',
       ko.reviewUrl.includes('&lang=ko') && !he.reviewUrl.includes('lang='), [ko.reviewUrl, he.reviewUrl])
-    check('E5: the unsubscribe page is bilingual, so the link narrows to en, never to ko',
-      ko.unsubscribeUrl.includes('lang=en') && he.unsubscribeUrl.includes('lang=he'), ko.unsubscribeUrl)
+    // E5 used to assert the opposite, on the premise that the unsubscribe page
+    // was bilingual. It was not: reminders.unsubscribePage has existed in all
+    // eleven languages the whole time, and only the LINK narrowed, so a Korean
+    // account read a Korean email and landed on an English page. The narrowing
+    // is gone (lib/i18n/__qa__/unsubscribe-language.qa.ts holds the page end).
+    check('E5: the unsubscribe link keeps the email\'s own language',
+      ko.unsubscribeUrl.includes('lang=ko') && he.unsubscribeUrl.includes('lang=he'), ko.unsubscribeUrl)
+    check('E5-MUT: a link narrowed back to en would fail E5',
+      !ko.unsubscribeUrl.replace('lang=ko', 'lang=en').includes('lang=ko'))
 
     // The narrowing that caused it lived in the live dependency, not the builder.
     const lives = ['lib/reminders/live.ts', 'lib/onboarding-emails/live.ts', 'lib/reports/weekly/live.ts']

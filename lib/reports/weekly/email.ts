@@ -17,7 +17,7 @@
 import { escapeEmailHtml } from '@/lib/notifications/signup-email'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { unsubscribeUrlFor } from '@/lib/reminders/email'
-import { toBilingualLocale, type PublicLocale } from '@/lib/i18n/locales'
+import { type PublicLocale } from '@/lib/i18n/locales'
 import type { WeeklySummary } from './aggregate'
 
 export const REPORTS_PATH = '/reports'
@@ -70,7 +70,7 @@ export function buildWeeklyEmail(input: WeeklyEmailInput): WeeklyEmail {
   const rtl = input.locale === 'he'
   const e = escapeEmailHtml
   const reportsUrl = reportsUrlFor(input.origin, input.projectId, input.locale)
-  const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, toBilingualLocale(input.locale))
+  const unsubscribeUrl = unsubscribeUrlFor(input.origin, input.token, input.locale)
   const subject = t.subject(input.domain)
   const greeting = t.greeting(input.firstName)
   const day = (iso: string) => iso.slice(0, 10)

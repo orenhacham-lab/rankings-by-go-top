@@ -89,8 +89,8 @@ const TOPICS: Record<string, Record<Lang, Rule>> = {
     he: { terms: [/הודעות דוא”ל/, /הודעת תזכורת/, /הסרה בלחיצה אחת/, /סיכום התקדמות שבועי/, /מיילי הקמה/, /הודעות חשבון ושירות/], privacy: [/הודעות דוא”ל/, /Resend/, /הסרה\s+בלחיצה אחת/, /סיכום שבועי/, /מיילי הקמה/, /הודעות חשבון ושירות/] },
   },
   '8 sub-processors': {
-    en: { terms: [/Serper/, /ScrapeLLM/, /Resend/, /Vercel/, /Supabase/, /PayPal/, /Shopify/], privacy: [/Supabase:/, /Vercel:/, /Google \(Gemini API, Search Console, Business Profile, Google Ads API\):/, /ScrapeLLM:/, /Serper:/, /Resend:/, /PayPal:/, /Shopify:/, /PDFShift:/, /OpenStreetMap \(Nominatim\):/, /Wix:/] },
-    he: { terms: [/Serper/, /ScrapeLLM/, /Resend/, /Vercel/, /Supabase/, /PayPal/, /Shopify/], privacy: [/Supabase:/, /Vercel:/, /Google \(Gemini API, Search Console, Business Profile, Google Ads API\):/, /ScrapeLLM:/, /Serper:/, /Resend:/, /PayPal:/, /Shopify:/, /PDFShift:/, /OpenStreetMap \(Nominatim\):/, /Wix:/] },
+    en: { terms: [/Serper/, /ScrapeLLM/, /Resend/, /Vercel/, /Supabase/, /PayPal/, /Shopify/], privacy: [/Supabase:/, /Vercel:/, /Google \(Gemini API, Search Console, Business Profile, Google Ads API\):/, /ScrapeLLM:/, /Serper:/, /Resend:/, /PayPal:/, /Shopify:/, /PDFShift:/, /OpenStreetMap \((?:Nominatim|[^)]*Nominatim[^)]*)\):/, /Wix:/] },
+    he: { terms: [/Serper/, /ScrapeLLM/, /Resend/, /Vercel/, /Supabase/, /PayPal/, /Shopify/], privacy: [/Supabase:/, /Vercel:/, /Google \(Gemini API, Search Console, Business Profile, Google Ads API\):/, /ScrapeLLM:/, /Serper:/, /Resend:/, /PayPal:/, /Shopify:/, /PDFShift:/, /OpenStreetMap \((?:Nominatim|[^)]*Nominatim[^)]*)\):/, /Wix:/] },
   },
   // 10-13 are the four gaps Oren found on 2026-10-03: the documents described
   // three connections while the code offers six, and three live sub-processors
@@ -104,8 +104,8 @@ const TOPICS: Record<string, Record<Lang, Rule>> = {
     he: { privacy: [/המרת דוח ל-PDF/, /PDFShift/, /רק כשלחצת להוריד דוח/] },
   },
   '12 the address lookup service': {
-    en: { privacy: [/Turning an Address into Coordinates/, /Nominatim/, /OpenStreetMap Foundation/, /do not send your name/] },
-    he: { privacy: [/תרגום כתובת לקואורדינטות/, /Nominatim/, /OpenStreetMap Foundation/, /איננו שולחים את שמך/] },
+    en: { privacy: [/Turning an Address into Coordinates/, /Nominatim/, /OpenStreetMap Foundation/, /do not send your name/, /map tiles are loaded directly by your\s+browser/, /IP address/] },
+    he: { privacy: [/תרגום כתובת לקואורדינטות/, /Nominatim/, /OpenStreetMap Foundation/, /איננו שולחים את שמך/, /אריחי המפה נטענים ישירות מהדפדפן שלך/, /כתובת ה-IP שלך/] },
   },
   '13 the Google Ads keyword interface': {
     en: { privacy: [/Google Ads API/, /search volumes/, /not an advertising account of yours/] },
@@ -260,6 +260,12 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'api.pdfshift.io': { en: /PDFShift/, he: /PDFShift/ },
     'api.scrapellm.com': { en: /ScrapeLLM/, he: /ScrapeLLM/ },
     'nominatim.openstreetmap.org': { en: /Nominatim/, he: /Nominatim/ },
+    // The map tiles under a grid scan's area map. A DIFFERENT KIND OF RECIPIENT
+    // from Nominatim above, which is called from our server: these are loaded by
+    // the reader's own browser, so OpenStreetMap receives their IP address and
+    // the tile numbers, from which the area they were looking at follows. Both
+    // policies say exactly that, in their own section.
+    'tile.openstreetmap.org': { en: /map tiles/, he: /אריחי מפה/ },
     'www.wixapis.com': { en: /Wix/, he: /Wix/ },
     'admin.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'cdn.shopify.com': { en: /Shopify/, he: /Shopify/ },
@@ -316,6 +322,11 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     // before a transaction, so the terms link it; the reader clicks it, and we
     // send nothing of theirs to it.
     'docs.creem.io': 'a documentation link cited in a code comment; not fetched',
+    // OpenStreetMap's copyright page, which using their tiles obliges us to link
+    // from the map. It is the attribution itself: the reader may click it, and we
+    // send nothing of theirs to it. The tile host, which DOES receive something,
+    // is in RECIPIENTS above.
+    'www.openstreetmap.org': 'the attribution link required beside the map tiles; a link the reader may click, never fetched by us',
     // ClickBank's own order-support destination, which their pitch-page rules
     // require the footer to link ("For Order Support, please contact ClickBank
     // HERE"). The buyer clicks it to reach the party that holds their money;

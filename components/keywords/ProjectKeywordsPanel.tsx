@@ -175,7 +175,7 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
    * error text, which after a fatal error was a raw provider or database string,
    * and in one language regardless of the merchant's.
    */
-  function scanFailureMessage(data: { errorCode?: string; error?: string }): string {
+  function scanFailureMessage(data: { errorCode?: string; code?: string; error?: string; errorEn?: string }): string {
     if (data?.errorCode === 'SCAN_IN_PROGRESS') return k.messages.scanInProgress
     if (data?.errorCode === 'SCAN_TIMEOUT') return k.messages.scanTimeout
     if (data?.errorCode === 'SCAN_FAILED') return k.messages.scanRetryable
@@ -183,7 +183,14 @@ export default function ProjectKeywordsPanel({ project }: { project: Project }) 
     // A quota refusal is a real, specific answer and already localized by the
     // server's bilingual quota payload; anything else degrades to the safe
     // retryable line rather than echoing server text.
-    if (data?.errorCode === 'QUOTA_KEYWORD_CHECKS' && data.error) return data.error
+    // The quota payload (lib/quota.ts buildQuotaError) names its kind in `code`,
+    // not `errorCode`, so matching `errorCode` never fired: a refused scan fell
+    // through to "failed, try again" and the real answer was never shown.
+    const quotaKind = data?.code ?? data?.errorCode
+    if (typeof quotaKind === 'string' && quotaKind.startsWith('QUOTA_')) {
+      const text = language === 'he' ? data.error : data.errorEn
+      if (text) return text
+    }
     return k.messages.scanRetryable
   }
 

@@ -169,6 +169,13 @@ export const projectsIt: DeepPartial<DashboardDictionary> = {
       chartLabel: (keyword: string) => `La posizione su Google di «${keyword}» a ogni rilevamento`,
       chartEmpty: 'Il grafico compare dopo due rilevamenti in cui il sito è stato trovato.',
       positionAt: (position: string) => `Posizione ${position}`,
+      gridTitle: 'Mappa della zona',
+      gridNorth: 'Il nord è in alto',
+      gridAverage: 'Posizione media su tutti i punti:',
+      gridInTop3: 'Punti nei primi 3:',
+      gridNotMeasured: 'Punto non misurato',
+      gridNoneFound: (n: number) => `L'attività non è stata trovata in nessuno dei ${n} punti misurati.`,
+      gridEmptyNote: 'Il controllo più recente non ha restituito alcun punto sulla mappa. In genere significa che la parola chiave non ha un centro: aprila in modifica e inserisci un indirizzo o delle coordinate.',
     },
   },
   competitors: {

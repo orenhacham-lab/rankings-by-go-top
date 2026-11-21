@@ -27,6 +27,7 @@ import { processScheduledScanForProject } from '@/lib/scan-scheduler/process-sch
 import { after } from 'next/server'
 import { runMonthlyAiChecks, startIsolatedMonthlyAiChecks } from '@/lib/ai-visibility/monthly-check/runner'
 import { retryPayPalMigrations } from '@/lib/shopify/paypal-migration-retry'
+import { readPassNumber, scanDeadlineAt, decideChain, nextPassUrl } from '@/lib/scan-scheduler/chain'
 
 // The rank schedule below is unchanged; the budget is for the automatic monthly
 // AI check that runs after it (platform clamps to the plan's max).
@@ -43,7 +44,19 @@ export async function GET(request: Request) {
   // own deadline (what is left of maxDuration) and its own try/catch. It never
   // throws, so it cannot change, delay or fail the rank schedule's work or answer.
   const startedAtMs = Date.now()
-  try {
+
+  // Which pass of this trigger we are. A pass beyond the first exists only
+  // because the previous one ran out of time, so everything below that is
+  // "once per trigger" rather than "once per invocation" must not run again.
+  const passNumber = readPassNumber(request.url)
+  const isFirstPass = passNumber === 1
+
+  // The instant after which no NEW project may be started. The remainder of
+  // maxDuration belongs to the project already in flight, to the after() work
+  // scheduled above, and to the response.
+  const deadlineAtMs = scanDeadlineAt(startedAtMs, maxDuration)
+
+  if (isFirstPass) try {
     after(() => startIsolatedMonthlyAiChecks(
       (deadlineAt) => runMonthlyAiChecks(createAdminClient(), { deadlineAt }),
       { startedAtMs, maxDurationMs: maxDuration * 1000 },
@@ -57,7 +70,7 @@ export async function GET(request: Request) {
   // a failed PayPal cancellation, and emails the operator about every row that
   // still fails. Same isolation as the AI check: after(), its own try, never
   // part of the rank answer below. It never throws.
-  try {
+  if (isFirstPass) try {
     after(() => retryPayPalMigrations(createAdminClient()).then(() => undefined, () => undefined))
   } catch {
     // after() outside a request scope (a direct call in a test): nothing to schedule.
@@ -100,7 +113,16 @@ export async function GET(request: Request) {
     error?: string
   }> = []
 
+  let stoppedForDeadline = false
   for (const project of projects) {
+    // Stop STARTING projects once the budget is spent. A project never started
+    // keeps its next_scan_at, so it is still due and the next pass takes it.
+    // This is what replaces being killed in the middle of one.
+    if (Date.now() >= deadlineAtMs) {
+      stoppedForDeadline = true
+      console.log(`[Schedule] pass ${passNumber}: deadline reached, ${projects.length - results.length} project(s) left for the next pass`)
+      break
+    }
     const outcome = await processScheduledScanForProject(admin, project, { now })
     if (outcome.status === 'completed') {
       results.push({ projectId: project.id, projectName: project.name, completed: outcome.completed, failed: outcome.failed })
@@ -118,5 +140,41 @@ export async function GET(request: Request) {
     }
   }
 
-  return Response.json({ processed: results.length, timestamp: now.toISOString(), results })
+  // Hand whatever is left to a fresh invocation of this same route, rather
+  // than leaving it until tomorrow. decideChain holds all three brakes: work
+  // remaining, forward progress, and the hard cap on passes.
+  const remaining = projects.length - results.length
+  const chain = decideChain({ processed: results.length, remaining, pass: passNumber })
+  if (chain.chain) {
+    const secret = process.env.CRON_SECRET
+    if (!secret) {
+      console.error('[Schedule] work remains but CRON_SECRET is unset, so the next pass cannot authenticate')
+    } else {
+      const url = nextPassUrl(request.url, chain.nextPass)
+      try {
+        after(async () => {
+          try {
+            await fetch(url, { headers: { Authorization: `Bearer ${secret}` } })
+          } catch (err) {
+            // A failed hand-off costs us this trigger's remaining work, never
+            // correctness: every unstarted project is still due.
+            console.error(`[Schedule] pass ${chain.nextPass} hand-off failed:`, (err as Error).message)
+          }
+        })
+      } catch {
+        // after() outside a request scope (a direct call in a test).
+      }
+    }
+  }
+
+  return Response.json({
+    processed: results.length,
+    pass: passNumber,
+    remaining,
+    stoppedForDeadline,
+    chained: chain.chain ? chain.nextPass : null,
+    chainReason: chain.reason,
+    timestamp: now.toISOString(),
+    results,
+  })
 }

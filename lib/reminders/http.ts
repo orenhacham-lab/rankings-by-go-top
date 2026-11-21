@@ -36,8 +36,8 @@ import type { ServiceRoleClient } from '@/lib/supabase/admin'
 import { escapeEmailHtml } from '@/lib/notifications/signup-email'
 import { UNSUBSCRIBE_PATH } from './email'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { normalizeLocale } from '@/lib/i18n/dashboard/locale'
-import type { Locale } from '@/lib/i18n/locales'
+import { normalizeStoredLocale } from '@/lib/i18n/locales'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { readState, writeEnabled } from './state'
 import { clearOnboardingOptOut, writeOnboardingOptOut } from '@/lib/onboarding-emails/state'
 import { writeWeeklyOff } from '@/lib/reports/weekly/store'
@@ -151,7 +151,7 @@ const HEADERS = {
  * `stopAllHref` is built from the same request's own token, so the page can offer that
  * click without a login.
  */
-export function unsubscribePage(locale: Locale, ok: boolean, opts: { scope?: UnsubscribeScope; stopAllHref?: string } = {}): string {
+export function unsubscribePage(locale: PublicLocale, ok: boolean, opts: { scope?: UnsubscribeScope; stopAllHref?: string } = {}): string {
   const t = getDashboardDictionary(locale).reminders.unsubscribePage
   const e = escapeEmailHtml
   const rtl = locale === 'he'
@@ -175,7 +175,9 @@ ${more}<a href="/" style="display:inline-block;background:#0070d6;color:#fff;tex
 export async function handleUnsubscribe(request: Request, deps: Pick<ReminderRouteDeps, 'admin' | 'now' | 'env'>): Promise<Response> {
   const url = new URL(request.url)
   const post = request.method === 'POST'
-  const locale: Locale = normalizeLocale(url.searchParams.get('lang')) ?? 'he'
+  // The email's own language, not a narrowing of it. A language that is not
+  // live is refused by normalizeStoredLocale and falls back to Hebrew.
+  const locale: PublicLocale = normalizeStoredLocale(url.searchParams.get('lang')) ?? 'he'
   const token = url.searchParams.get('t')
   const scope = unsubscribeScope(url.searchParams.get('s'))
   const outcome = await unsubscribeByToken(token, deps, scope)
