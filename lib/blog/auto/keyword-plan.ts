@@ -292,11 +292,92 @@ export const TAIL_BONUS = 10
 /** Beyond this many words, another word says nothing more about specificity. */
 export const TAIL_WORDS_CAP = 6
 
-/** Lower is more winnable for a site with little authority. Pure. */
-export function keywordDifficulty(idea: Pick<KeywordIdeaResult, 'keyword' | 'competition' | 'competitionIndex'>): number {
+/**
+ * HOW SPECIFIC A KEYWORD IS, IN WORDS — COUNTED SO THAT JAPANESE COUNTS AT ALL.
+ *
+ * `keywordTokens` splits on spaces, and Japanese and Korean write none, so
+ * every Japanese keyword scored as ONE word however specific it was:
+ * `Googleビジネスプロフィール活用` and `SEO` were the same length to the
+ * ranking above, and the tail bonus — the whole mechanism that prefers a
+ * specific keyword to a head term — was dead in those two languages. Measured
+ * 21 Nov 2026: the Japanese articles published average 8,685 monthly searches
+ * while the Japanese rows still waiting average 99.
+ *
+ * Where a language writes no spaces, the character count stands in, at four
+ * characters to a word. That is the average these scripts run at, and it is a
+ * stand-in, not a measurement — which is the same honest limit the advertiser
+ * competition index carries.
+ */
+export function specificityWords(keyword: string): number {
+  const words = keywordTokens(keyword).length
+  if (words > 1) return words
+  const noSpaceChars = (keyword.match(/[\u3000-\u9fff\uac00-\ud7af]/g) ?? []).length
+  return noSpaceChars >= 4 ? Math.max(words, Math.round(noSpaceChars / 4)) : words
+}
+
+/**
+ * ABOVE THIS MANY MONTHLY SEARCHES, A KEYWORD IS A HEAD TERM FOR THIS SITE.
+ *
+ * Not "a big keyword" in general — one this site cannot win today. The
+ * thresholds are set from what the queue actually chose, read on 21 Nov 2026,
+ * and that reading is also the clearest statement of why a volume term is
+ * needed at all. Every one of the fourteen biggest keywords ever published
+ * here came back from Keyword Planner as competition LOW:
+ *
+ *   google search console   en  450,000  LOW
+ *   google search console   de  135,000  LOW
+ *   サーチ コンソール          ja  110,000  LOW
+ *   keyword research        en   90,500  LOW
+ *   google keyword planner  en   49,500  LOW
+ *
+ * Advertiser competition is low for an informational head term exactly
+ * because nobody bids on it, while its ORGANIC difficulty is the highest on
+ * the board. So the one number the ranking trusted was telling it that the
+ * least winnable keywords in the niche were the easiest, and the ranking
+ * believed it. The site holds those queries at position 62 to 84.
+ */
+export const HEAD_VOLUME: Record<BlogAutoLocale, number> = {
+  he: 2000, en: 5000, es: 2000, 'pt-BR': 2000, fr: 2000, it: 2000, ja: 2000, de: 2000, nl: 2000,
+  // Poland and Korea are smaller search markets — Google holds a minority of
+  // Korean search at all (Naver is the other half) — so the same number would
+  // be a threshold nothing ever reaches.
+  pl: 1000, ko: 1000,
+}
+
+/** Difficulty points added for each doubling of volume above that threshold. */
+export const HEAD_PENALTY_PER_DOUBLING = 12
+/** The most the penalty can ever be, so it orders heads without erasing them. */
+export const HEAD_PENALTY_CAP = 60
+
+/**
+ * The penalty a head term carries. It REORDERS, it never rejects: the queue in
+ * every language is 6 to 17 rows deep (measured 21 Nov 2026), so a filter here
+ * would be a language with no article that day, which is the one cost this
+ * blog is not allowed to pay.
+ */
+export function headPenalty(locale: BlogAutoLocale, monthlySearches: number | null | undefined): number {
+  const head = HEAD_VOLUME[locale]
+  const volume = monthlySearches ?? 0
+  if (volume <= head) return 0
+  return Math.min(Math.log2(volume / head) * HEAD_PENALTY_PER_DOUBLING, HEAD_PENALTY_CAP)
+}
+
+/**
+ * Lower is more winnable for a site with little authority. Pure.
+ *
+ * With no locale it is the advertiser competition minus the tail bonus, as
+ * before. With one it also carries the head-term penalty, which is what stops
+ * `google search console` at 450,000 a month from being treated as the easiest
+ * thing in the queue because its advertiser competition happens to be low.
+ */
+export function keywordDifficulty(
+  idea: Pick<KeywordIdeaResult, 'keyword' | 'competition' | 'competitionIndex'> & { avgMonthlySearches?: number | null },
+  locale?: BlogAutoLocale,
+): number {
   const ads = idea.competitionIndex ?? (idea.competition ? COMPETITION_FALLBACK[idea.competition] : 50)
-  const words = Math.min(keywordTokens(idea.keyword ?? '').length, TAIL_WORDS_CAP)
-  return ads - Math.max(words - 1, 0) * TAIL_BONUS
+  const words = Math.min(specificityWords(idea.keyword ?? ''), TAIL_WORDS_CAP)
+  const head = locale ? headPenalty(locale, idea.avgMonthlySearches) : 0
+  return ads - Math.max(words - 1, 0) * TAIL_BONUS + head
 }
 
 export interface SelectKeywordsInput {
@@ -321,7 +402,7 @@ export function selectKeywords(input: SelectKeywordsInput): SelectedKeyword[] {
   const blocking = [...input.taken]
 
   const ranked = [...input.ideas].sort((a, b) => {
-    const d = keywordDifficulty(a) - keywordDifficulty(b)
+    const d = keywordDifficulty(a, input.locale) - keywordDifficulty(b, input.locale)
     if (d !== 0) return d
     return (b.avgMonthlySearches ?? 0) - (a.avgMonthlySearches ?? 0)
   })
