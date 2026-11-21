@@ -1,31 +1,43 @@
 'use client'
 
 /**
- * THE AREA MAP: one pin per measurement point of a geo-grid check, laid out as
- * the square was measured — row 0 northernmost, column 0 westernmost — and
- * coloured by the position found there.
+ * THE AREA MAP: one pin per measurement point of a geo-grid check, laid over
+ * the actual map, at the coordinates it was measured at, and coloured by the
+ * position found there.
  *
- * WHY THERE IS NO MAP UNDERNEATH. A tile layer (Google, Mapbox, even
- * OpenStreetMap through a hosted provider) is a third-party request per view, a
- * key to hold, an attribution to honour and, above a free tier, a bill. What
- * the picture has to say — "first place at your own door, eleventh three
- * kilometres north" — is carried entirely by the pins' arrangement and their
- * numbers. So the grid is drawn on our own surface, with north stated in words,
- * and a tile layer can be slid underneath later without changing this
- * component's contract.
+ * THE MAP UNDERNEATH is OpenStreetMap, chosen by the owner on 2026-11-21 for
+ * the reason that it costs nothing. It is drawn as a still mosaic of tiles by
+ * lib/maps/osm-tiles.ts — no mapping library, no pan, no zoom — because a geo
+ * grid is a picture of a square that was measured once, and Leaflet or MapLibre
+ * would add a package, a stylesheet and a second way for this screen to break.
+ * The attribution is a condition of using those tiles, so it is rendered on the
+ * map and the suite fails if it is removed. If the tiles do not load, the pins
+ * are still in the right places on a plain surface: the map is the backdrop,
+ * never the data.
  *
  * COLOUR IS NEVER THE ONLY ENCODING. Every pin prints its own position, and the
  * check table on the same screen is the table view of the same data, which is
  * what makes the four marks legal for a reader who cannot separate them: the
  * marks were stepped against the dataviz validator (see the --color-grid-*
  * tokens in app/globals.css) and the dark mode is stepped for the dark surface
- * rather than flipped.
+ * rather than flipped. Over map tiles each pin also carries a ring of the
+ * page's own surface colour, so a pin never has to be told apart from a road.
+ *
+ * A POINT THE SCAN NEVER REACHED is drawn as a dashed outline at the place it
+ * WOULD have been measured, computed from the lattice the measured points
+ * describe — never as a grey pin, because "not measured" is not "not found",
+ * and never omitted, because a 5x5 that stopped at 18 points must not read as
+ * a complete picture.
  *
  * THE GRID IS NOT MIRRORED IN HEBREW. Everything else on the screen runs right
- * to left; a map does not. West is on the left in every language, so the grid
+ * to left; a map does not. West is on the left in every language, so the map
  * itself is pinned to `dir="ltr"` while its caption and legend follow the page.
  */
+import { useEffect, useRef, useState } from 'react'
 import { gridBucket, type GridBucket } from '@/lib/scanner/grid-scan'
+import {
+  boundsOf, planTiles, TILE_SIZE, TILE_ATTRIBUTION, TILE_ATTRIBUTION_HREF, type LatLng,
+} from '@/lib/maps/osm-tiles'
 
 export interface GridMapPoint {
   row: number
@@ -71,11 +83,70 @@ export function gridMapSummary(points: GridMapPoint[]): { average: number | null
   }
 }
 
+/**
+ * WHERE A CELL THE SCAN NEVER REACHED WOULD HAVE BEEN.
+ *
+ * The points of a grid are a lattice: a fixed step of latitude between rows and
+ * a fixed step of longitude between columns. Two measured points in different
+ * rows give the latitude step, two in different columns the longitude step, and
+ * one measured point anchors both. A grid that was stopped early is missing
+ * whole trailing rows, so the measured points always span enough of the lattice
+ * to describe it — unless only one point was measured, in which case there is
+ * nothing to interpolate and `null` is returned rather than a guess.
+ */
+export function gridLattice(points: GridMapPoint[]): ((row: number, col: number) => LatLng) | null {
+  const usable = points.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
+  if (usable.length < 2) return null
+  const anchor = usable[0]
+
+  const rowPair = usable.find((p) => p.row !== anchor.row)
+  const colPair = usable.find((p) => p.col !== anchor.col)
+  if (!rowPair || !colPair) return null
+
+  const dLat = (rowPair.lat - anchor.lat) / (rowPair.row - anchor.row)
+  const dLng = (colPair.lng - anchor.lng) / (colPair.col - anchor.col)
+  if (!Number.isFinite(dLat) || !Number.isFinite(dLng)) return null
+
+  return (row: number, col: number) => ({
+    lat: anchor.lat + (row - anchor.row) * dLat,
+    lng: anchor.lng + (col - anchor.col) * dLng,
+  })
+}
+
+/** The box the map is drawn in before the real width is known. */
+const DEFAULT_BOX = 420
+
 export default function GridMap({ points, labels }: { points: GridMapPoint[]; labels: GridMapLabels }) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [box, setBox] = useState(DEFAULT_BOX)
+
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width)
+      if (w > 0) setBox(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   const side = gridSide(points)
   if (side === 0) return null
-  const byCell = new Map(points.map((p) => [`${p.row}:${p.col}`, p]))
+
   const summary = gridMapSummary(points)
+  const byCell = new Map(points.map((p) => [`${p.row}:${p.col}`, p]))
+  const lattice = gridLattice(points)
+
+  // The pin's own size, so a 9x9 does not become a wall of touching circles.
+  const pin = Math.max(20, Math.min(40, Math.floor((box / side) * 0.78)))
+  const bounds = boundsOf(points.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng)))
+  const plan = bounds ? planTiles(bounds, box, box, { padPx: Math.ceil(pin / 2) + 4 }) : null
+
+  const cells = Array.from({ length: side * side }, (_, i) => ({
+    row: Math.floor(i / side),
+    col: i % side,
+  }))
 
   return (
     <div>
@@ -85,31 +156,73 @@ export default function GridMap({ points, labels }: { points: GridMapPoint[]; la
       </div>
 
       <div
+        ref={boxRef}
         dir="ltr"
-        className="mt-3 grid gap-1 rounded-control bg-sunk p-2"
-        style={{ gridTemplateColumns: `repeat(${side}, minmax(0, 1fr))` }}
+        className="relative mt-3 w-full max-w-[520px] overflow-hidden rounded-control bg-sunk"
+        style={{ height: box }}
       >
-        {Array.from({ length: side * side }, (_, i) => {
-          const row = Math.floor(i / side)
-          const col = i % side
-          const point = byCell.get(`${row}:${col}`)
-          if (!point) {
-            // A point the deadline stopped us from measuring: an empty cell,
-            // never a grey pin, because "not measured" is not "not found".
-            return <div key={i} className="aspect-square rounded-full border border-dashed border-line" />
-          }
-          const bucket = gridBucket(point)
-          const text = bucket === 'absent' ? '·' : String(point.position)
-          return (
-            <div
-              key={i}
-              className={`flex aspect-square items-center justify-center rounded-full text-caption font-bold tabular-nums ${MARK[bucket]}`}
-              title={`${point.lat.toFixed(4)}, ${point.lng.toFixed(4)} — ${bucket === 'absent' ? labels.notFound : String(point.position)}`}
-            >
-              {text}
-            </div>
-          )
-        })}
+        {plan?.tiles.map((t) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={`${t.z}/${t.x}/${t.y}`}
+            src={t.url}
+            alt=""
+            aria-hidden="true"
+            width={TILE_SIZE}
+            height={TILE_SIZE}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="pointer-events-none absolute select-none"
+            style={{ left: t.left, top: t.top, width: TILE_SIZE, height: TILE_SIZE }}
+          />
+        ))}
+
+        {plan &&
+          cells.map(({ row, col }) => {
+            const point = byCell.get(`${row}:${col}`)
+            const at = point && Number.isFinite(point.lat) ? { lat: point.lat, lng: point.lng } : lattice?.(row, col)
+            if (!at) return null
+            const pos = plan.positionOf(at)
+            const style = {
+              left: pos.left,
+              top: pos.top,
+              width: pin,
+              height: pin,
+              transform: 'translate(-50%, -50%)',
+            } as const
+
+            if (!point) {
+              // Never reached: the place it would have been, drawn as an outline.
+              return (
+                <div
+                  key={`${row}:${col}`}
+                  className="absolute rounded-full border border-dashed border-line bg-surface/60"
+                  style={style}
+                />
+              )
+            }
+
+            const bucket = gridBucket(point)
+            return (
+              <div
+                key={`${row}:${col}`}
+                className={`absolute flex items-center justify-center rounded-full text-caption font-bold tabular-nums ring-2 ring-surface ${MARK[bucket]}`}
+                style={style}
+                title={`${point.lat.toFixed(4)}, ${point.lng.toFixed(4)} — ${bucket === 'absent' ? labels.notFound : String(point.position)}`}
+              >
+                {bucket === 'absent' ? '·' : String(point.position)}
+              </div>
+            )
+          })}
+
+        <a
+          href={TILE_ATTRIBUTION_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute bottom-0 right-0 bg-surface/80 px-1.5 py-0.5 text-caption text-muted"
+        >
+          {TILE_ATTRIBUTION}
+        </a>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-caption">

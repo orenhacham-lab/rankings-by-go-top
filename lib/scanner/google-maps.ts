@@ -1068,6 +1068,36 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
   const cityLower = effectiveCity?.toLowerCase() || ''
   const cityCoordinates = cityLower ? ISRAELI_CITIES[cityLower] : undefined
 
+  // A CITY OUTSIDE ISRAEL AND THE UNITED STATES HAD NO COORDINATES AT ALL.
+  //
+  // The branch below has exactly two arms, and the second one calls itself
+  // "Non-IL (US)" because when it was written those were the only two countries
+  // the product had. Israel has a built-in table of city coordinates; the United
+  // States has the provider's own understanding of "Los Angeles, CA". Italy,
+  // Spain, Brazil, Germany and the rest fall into the second arm and are sent
+  // the bare city name as text, with no `ll` whatsoever — so the measurement
+  // point is whatever the provider makes of the word "Milano".
+  //
+  // Every other location mode in this file resolves its input to a point first.
+  // This one now does too, through the same geocoder, in the project's own
+  // country. Measured on 2026-11-21: a city name resolves in every country we
+  // sell in, in the local script and in English.
+  //
+  // IL and US are untouched by construction — `il` keeps its single-attempt arm
+  // and `us` is excluded here, so neither request changes by a byte. The third
+  // attempt below stays gated on the ISRAELI table, not on this value, so it
+  // still never fires outside Israel.
+  let resolvedCityCoordinates = cityCoordinates
+  if (!resolvedCityCoordinates && effectiveCity && country !== 'il' && country !== 'us') {
+    const cityGeo = await geocodeAddress(effectiveCity, country)
+    if (cityGeo.ok) {
+      resolvedCityCoordinates = { lat: cityGeo.lat, lng: cityGeo.lng }
+      console.log(`[Maps] city "${effectiveCity}" resolved to a point via ${cityGeo.provider}`)
+    } else {
+      console.warn(`[Maps] city "${effectiveCity}" did not resolve to a point; sending the name only, as before`)
+    }
+  }
+
   console.log('[Maps] ========== SCAN START ==========')
   console.log('[Maps] Input:', {
     keyword: input.keyword,
@@ -1109,12 +1139,12 @@ export async function scanGoogleMaps(input: ScanInput): Promise<ScanOutput> {
       contextAttempts.push({
         label: `city "${effectiveCity}"`,
         location: effectiveCity!,
-        coordinates: cityCoordinates,
+        coordinates: resolvedCityCoordinates,
       })
       contextAttempts.push({
         label: `city+country "${effectiveCity}, ${country.toUpperCase()}"`,
         location: `${effectiveCity}, ${country.toUpperCase()}`,
-        coordinates: cityCoordinates,
+        coordinates: resolvedCityCoordinates,
       })
       if (cityCoordinates) {
         contextAttempts.push({

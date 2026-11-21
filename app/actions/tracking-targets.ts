@@ -8,7 +8,7 @@ import { buildQuotaError, EN_PLAN_LABEL, EntitlementUnavailableError, isEntitlem
 import { actionMessages, asActionResult, type ActionMessages, type ActionResult } from '@/lib/i18n/action-messages'
 import { UserFacingError } from '@/lib/i18n/user-facing-error'
 import { geocodeAddress, validateCoordinatePair } from '@/lib/geocoding'
-import { isValidPostalCode } from '@/lib/scanner/postal-input'
+import { isValidPostalCode, postalCodeIsLocatable } from '@/lib/scanner/postal-input'
 import { DEFAULT_GRID_SIZE, isGridSize } from '@/lib/scanner/grid-scan'
 import type { ExactPointResolutionSource, GridSize } from '@/lib/supabase/types'
 import { isAdminUser } from '@/lib/auth/admin-role'
@@ -217,6 +217,13 @@ export async function createTrackingTargetAction(formData: FormData) {
     Object.assign(data, resolved)
   } else if (locationMode === 'zip') {
     const projectCountry = await fetchProjectCountry(supabase, projectId, m)
+    // Measured, not assumed: an Israeli postal code is not in the geocoder's
+    // data at all, so this mode would save and then fail at scan time with
+    // "could not resolve postal code". See postalCodeIsLocatable in
+    // lib/scanner/postal-input.ts.
+    if (!postalCodeIsLocatable(projectCountry)) {
+      throw new UserFacingError(m.postalCodeNotLocatable)
+    }
     if (!isValidPostalCode(safeStringFromFormData(formData, 'postal_code'), projectCountry)) {
       throw new UserFacingError(m.postalCodeInvalid)
     }
@@ -335,6 +342,13 @@ export async function createBulkTrackingTargetsAction(formData: FormData) {
     resolvedExact = await resolveExactPointFromFormData(formData, projectCountry, m)
   } else if (locationMode === 'zip') {
     const projectCountry = await fetchProjectCountry(supabase, projectId, m)
+    // Measured, not assumed: an Israeli postal code is not in the geocoder's
+    // data at all, so this mode would save and then fail at scan time with
+    // "could not resolve postal code". See postalCodeIsLocatable in
+    // lib/scanner/postal-input.ts.
+    if (!postalCodeIsLocatable(projectCountry)) {
+      throw new UserFacingError(m.postalCodeNotLocatable)
+    }
     if (!isValidPostalCode(postalCode, projectCountry)) {
       throw new UserFacingError(m.postalCodeInvalid)
     }
@@ -467,6 +481,13 @@ export async function updateTrackingTargetAction(id: string, formData: FormData)
       .eq('id', id)
       .single<{ project_id: string; projects: { country: string } }>()
     if (lookupErr || !existing) throw new UserFacingError(m.projectNotFound)
+    // Measured, not assumed: an Israeli postal code is not in the geocoder's
+    // data at all, so this mode would save and then fail at scan time with
+    // "could not resolve postal code". See postalCodeIsLocatable in
+    // lib/scanner/postal-input.ts.
+    if (!postalCodeIsLocatable(existing.projects.country || 'IL')) {
+      throw new UserFacingError(m.postalCodeNotLocatable)
+    }
     if (!isValidPostalCode(safeStringFromFormData(formData, 'postal_code'), existing.projects.country || 'IL')) {
       throw new UserFacingError(m.postalCodeInvalid)
     }

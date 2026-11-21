@@ -11,7 +11,7 @@ import { TrackingTarget, LocationMode } from '@/lib/supabase/types'
 import { saveTrackingTargetsAction } from '@/app/actions/tracking-targets'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
-import { postalRules, sanitizePostalInput } from '@/lib/scanner/postal-input'
+import { postalCodeIsLocatable, postalRules, sanitizePostalInput } from '@/lib/scanner/postal-input'
 import { GRID_DIMENSIONS, DEFAULT_GRID_SIZE, gridPointCount, type GridSize } from '@/lib/scanner/grid-scan'
 
 interface TrackingTargetFormProps {
@@ -259,11 +259,13 @@ export default function TrackingTargetForm({
           options={[
             { value: 'project', label: `${t.locationModeProject}${projectCity ? ` (${projectCity})` : ''}` },
             { value: 'custom', label: t.locationModeCustom },
-            // Postal code and exact point work in every country: the postal code
-            // is geocoded in the project's own country and the exact point is
-            // coordinates. Only RADIUS is still American — its grid is compass
-            // points in miles around a US ZIP.
-            { value: 'zip', label: t.locationModeZip },
+            // Exact point and the grid work in every country: both are
+            // coordinates. Postal code works wherever a postal code can be
+            // turned into a point, which was MEASURED per country — in Israel
+            // it cannot, so it is not offered there (postalCodeIsLocatable in
+            // lib/scanner/postal-input.ts). Only RADIUS is still American — its
+            // grid is compass points in miles around a US ZIP.
+            ...(postalCodeIsLocatable(projectCountry) ? [{ value: 'zip', label: t.locationModeZip }] : []),
             { value: 'exact_point', label: t.locationModeExactPoint },
             { value: 'grid', label: t.locationModeGrid },
             ...(projectCountry?.toUpperCase() === 'US' ? [{ value: 'radius', label: t.locationModeRadius }] : []),

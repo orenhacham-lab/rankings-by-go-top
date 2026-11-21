@@ -106,7 +106,7 @@ export default function EnglishPrivacyPage() {
           <li><strong>Wix:</strong> only if you connected a Wix site — to read the site&rsquo;s content and publish articles to its blog</li>
           <li><strong>The endpoint you configured yourself (webhook):</strong> only if you connected a site on another platform — the article is sent to the address you gave, in a signed request</li>
           <li><strong>PDFShift:</strong> to convert a report to PDF, and only when you asked to download one. We send the report&rsquo;s content as displayed in order to get the PDF file back</li>
-          <li><strong>OpenStreetMap (Nominatim):</strong> to turn an address into coordinates, and only when you typed an exact address for local rank tracking. The address you typed and the country name are sent, never account details</li>
+          <li><strong>OpenStreetMap (Nominatim and map tiles):</strong> to turn an address into coordinates, and only when you typed an exact address for local rank tracking — the address you typed and the country name are sent, never account details. In addition, when you open the area map of a grid scan in the dashboard, your browser loads the map tiles directly from OpenStreetMap&rsquo;s servers, so they receive your IP address, your browser identifier and the tile numbers requested, which is to say the geographic area you are looking at. We do not send them your name, your email address or any other account details</li>
           <li><strong>ScrapeLLM:</strong> for AI visibility tracking — see &ldquo;AI Providers&rdquo; below</li>
           <li><strong>Other sites in the link network:</strong> only if you joined the network — see &ldquo;Link Network&rdquo; below</li>
           <li><strong>JVZoo:</strong> only if you opened our JVZoo marketplace sales page — a tracking
@@ -416,6 +416,14 @@ export default function EnglishPrivacyPage() {
           the tracking target&rsquo;s definition, and you can change or delete them in the target&rsquo;s
           settings. OpenStreetMap is operated by the OpenStreetMap Foundation, and the Nominatim service has
           its own usage and privacy policy.
+        </p>
+        <p>
+          The background map of the &ldquo;area map&rdquo; shown for a grid scan comes from the same source.
+          Unlike the address lookup, which is made from our server, the map tiles are loaded directly by your
+          browser, so OpenStreetMap receives your IP address, your browser identifier and the tile numbers you
+          requested, from which the geographic area you were looking at can be inferred. We do not pass them
+          your name, your email address or any account details. The map is shown only on the page of a keyword
+          that was scanned in grid mode, and nowhere else.
         </p>
       </section>
 

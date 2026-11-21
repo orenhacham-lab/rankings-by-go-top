@@ -55,6 +55,40 @@ const RULES: Record<string, PostalRules> = {
   ca: { maxLength: 7, digitsOnly: false, pattern: /^[A-Za-z]\d[A-Za-z] ?\d[A-Za-z]\d$/, placeholder: 'K1A 0B1' },
 }
 
+/**
+ * WHETHER A POSTAL CODE IN THIS COUNTRY CAN BE TURNED INTO A POINT AT ALL.
+ *
+ * A shape that validates is not the same as a postal code the geocoder knows,
+ * and the scanner needs a point: it converts the code to lat/lng and asks the
+ * provider there. Measured on 2026-11-21 against the geocoder's FALLBACK
+ * provider (Nominatim), one real postal code per country, through the exact
+ * query the scanner sends:
+ *
+ *   resolved: us 10001 / 94103, it 00184 / 20121, es 28013 / 08002,
+ *             br 01310-100 / 20040-020, de 10115, fr 75001, nl 1012 AB,
+ *             pl 00-001, jp 100-0001, kr 04524, gb SW1A 1AA, ca M5H 2N2
+ *   NOT resolved: il 6701101, 9103401, 3109601, 4951001 — and 67011 and 6701,
+ *             so it is not the seven-digit form either. Israeli postal codes
+ *             are simply not in the data.
+ *
+ * So Israel is the one country where this mode would validate, save, and then
+ * fail at scan time with "could not resolve postal code". It is not offered
+ * there. An Israeli project tracks a place by CITY or by EXACT POINT, both of
+ * which were measured working the same day (תל אביב, חיפה, רמת גן, באר שבע all
+ * resolve, in Hebrew and in English).
+ *
+ * A country not named here is LOCATABLE, like the permissive row above: the
+ * twelve measured countries are the ones we sell in, and refusing every other
+ * one would block a mode that works. The measurement above is of the weaker of
+ * the two providers — the primary is Google, which was not reachable from the
+ * measuring environment — so a country that passes on the fallback passes.
+ */
+const NOT_LOCATABLE = new Set(['il'])
+
+export function postalCodeIsLocatable(country: string | null | undefined): boolean {
+  return !NOT_LOCATABLE.has((country || '').trim().toLowerCase())
+}
+
 export function postalRules(country: string | null | undefined): PostalRules {
   const code = (country || '').trim().toLowerCase()
   return RULES[code] || GENERIC

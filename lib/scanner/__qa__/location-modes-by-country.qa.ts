@@ -39,7 +39,7 @@
  * Run: npx tsx lib/scanner/__qa__/location-modes-by-country.qa.ts
  */
 import { readFileSync } from 'fs'
-import { postalRules, sanitizePostalInput, isValidPostalCode } from '../postal-input'
+import { postalRules, sanitizePostalInput, isValidPostalCode, postalCodeIsLocatable } from '../postal-input'
 
 let pass = 0, fail = 0
 function check(name: string, cond: boolean, detail?: string) {
@@ -79,7 +79,13 @@ check('the postal-code refusal exists in Hebrew and in English',
 // ----------------------------------------------------------------- B. form
 console.log('\nB) the form')
 
-const guardZipOfferedToAll = (src: string) => /\{ value: 'zip', label: t\.locationModeZip \},/.test(src)
+// The option is no longer unconditional, and must not be: it is offered where a
+// postal code was MEASURED to resolve to a point (section F). What this guard
+// still holds is that the old AMERICAN condition is gone — the country test in
+// front of it may only be postalCodeIsLocatable, never a comparison with 'US'.
+const guardZipOfferedToAll = (src: string) =>
+  /postalCodeIsLocatable\(projectCountry\) \? \[\{ value: 'zip', label: t\.locationModeZip \}\]/.test(src) &&
+  !/'US'[^\n]*value: 'zip'/.test(src)
 const guardExactPointOfferedToAll = (src: string) => /\{ value: 'exact_point', label: t\.locationModeExactPoint \},/.test(src)
 const guardRadiusOfferedToUsOnly = (src: string) =>
   /projectCountry\?\.toUpperCase\(\) === 'US' \? \[\{ value: 'radius'/.test(src)
@@ -93,7 +99,7 @@ const guardPostalFieldUsesRules = (src: string) =>
   /maxLength=\{postalRules\(projectCountry\)\.maxLength\}/.test(src) &&
   /sanitizePostalInput\(e\.target\.value, projectCountry\)/.test(src)
 
-check('postal code is offered to every country', guardZipOfferedToAll(FORM_SRC))
+check('postal code is offered by measured capability, never by being American', guardZipOfferedToAll(FORM_SRC))
 check('exact point is offered to every country', guardExactPointOfferedToAll(FORM_SRC))
 check('radius is offered to the United States only', guardRadiusOfferedToUsOnly(FORM_SRC))
 check('selecting postal code is no longer refused outside the US', guardNoZipOnChangeRefusal(FORM_SRC))
@@ -194,6 +200,94 @@ check('the five-digit guard fails on the old field',
   !guardNoFiveDigitPostalField('<Input name="postal_code" maxLength={5} pattern="\\d{5}" />'))
 check('the rules guard fails on the old hardcoded field',
   !guardPostalFieldUsesRules('placeholder="12345" maxLength={5}'))
+
+// ------------------------------------- F. measured per country, not assumed
+console.log('\nF) a mode is offered where it was MEASURED to work, and nowhere else')
+
+/**
+ * The measurement behind this section, run on 2026-11-21 against the geocoder's
+ * fallback provider through the exact query the scanner sends (one real postal
+ * code per country, `countrycodes=<cc>`):
+ *   resolved: us 10001/94103, it 00184/20121, es 28013/08002, br 01310-100/
+ *             20040-020, de 10115, fr 75001, nl 1012 AB, pl 00-001,
+ *             jp 100-0001, kr 04524, gb SW1A 1AA, ca M5H 2N2
+ *   not resolved: il 6701101, 9103401, 3109601, 4951001, 67011, 6701
+ * Israeli CITY names resolve perfectly the same day, in Hebrew and in English,
+ * which is why the answer for Israel is "city or exact point", not "no
+ * location tracking".
+ */
+const LOCATABLE = ['us', 'it', 'es', 'br', 'de', 'fr', 'nl', 'pl', 'jp', 'kr', 'gb', 'ca']
+
+check('F1: every country whose postal code was measured resolving is offered the mode',
+  LOCATABLE.every((c) => postalCodeIsLocatable(c)))
+check('F2: Israel is not, because its postal codes resolve to nothing',
+  !postalCodeIsLocatable('il') && !postalCodeIsLocatable('IL') && !postalCodeIsLocatable(' il '))
+check('F3: a country we have not measured is still offered it, rather than refused',
+  postalCodeIsLocatable('pt') && postalCodeIsLocatable('se') && postalCodeIsLocatable(null))
+check('F4: the Israeli postal SHAPE is still known, so an existing row still reads correctly',
+  isValidPostalCode('7546302', 'il') && postalRules('il').maxLength === 7)
+
+const guardFormHidesUnlocatableZip = (src: string) =>
+  /postalCodeIsLocatable\(projectCountry\)\s*\?\s*\[\{\s*value: 'zip'/.test(src)
+const guardActionsRefuseUnlocatableZip = (src: string) =>
+  (src.match(/postalCodeIsLocatable\(/g) || []).length === 3 &&
+  (src.match(/m\.postalCodeNotLocatable/g) || []).length === 3
+check('F5: the form does not offer the mode where it cannot work',
+  guardFormHidesUnlocatableZip(FORM_SRC))
+check('F6: and all three write paths refuse it there, because a form is never trusted',
+  guardActionsRefuseUnlocatableZip(ACTIONS_SRC))
+check('F7: the refusal is our own sentence, in both languages, with no provider text',
+  (MESSAGES_SRC.match(/postalCodeNotLocatable:/g) || []).length === 2 &&
+  !/could not resolve|ZERO_RESULTS|nominatim/i.test((MESSAGES_SRC.match(/postalCodeNotLocatable:[^\n]*/g) || []).join(' ')))
+check('F5-MUT: the old unconditional option fails F5',
+  !guardFormHidesUnlocatableZip("{ value: 'zip', label: t.locationModeZip },"))
+check('F6-MUT: a write path that forgot the check fails F6',
+  !guardActionsRefuseUnlocatableZip('postalCodeIsLocatable( m.postalCodeNotLocatable postalCodeIsLocatable( m.postalCodeNotLocatable'))
+
+// ------------------------------- G. a city becomes a point outside IL and US
+console.log('\nG) a city is measured from a point, in every country that has no table of its own')
+
+/**
+ * THE DEFECT. The city branch of lib/scanner/google-maps.ts has two arms, and
+ * the second names itself "Non-IL (US)" because the product knew two countries
+ * when it was written. Israel has ISRAELI_CITIES; the United States has the
+ * provider's own reading of "Los Angeles, CA". Everyone else — Italy, Spain,
+ * Brazil, Germany, the Netherlands — was sent the bare city name and NO `ll`,
+ * so the point the rank is measured from was whatever the provider made of the
+ * word. City names were measured resolving in every one of those countries on
+ * 2026-11-21, so the city now becomes a point like every other mode's input.
+ *
+ * IL and US must not change by a byte: `il` keeps its single-attempt arm, `us`
+ * is excluded from the new resolution, and the third attempt stays gated on the
+ * ISRAELI table so it still never fires outside Israel.
+ */
+const MAPS_SRC = stripComments(readFileSync('lib/scanner/google-maps.ts', 'utf8'))
+
+const guardCityResolvedOutsideIlUs = (src: string) =>
+  /country !== 'il' && country !== 'us'/.test(src) && /geocodeAddress\(effectiveCity, country\)/.test(src)
+const guardAttemptsCarryResolvedPoint = (src: string) =>
+  (src.match(/coordinates: resolvedCityCoordinates/g) || []).length === 2
+const guardIsraelArmUntouched = (src: string) =>
+  /IL single-attempt/.test(src) && /coordinates: cityCoordinates,\n\s*\}\)\n\s*\} else \{/.test(src)
+const guardThirdAttemptStillIsraeliTable = (src: string) =>
+  /if \(cityCoordinates\) \{/.test(src)
+
+check('G1: outside Israel and the United States the city is resolved to a point',
+  guardCityResolvedOutsideIlUs(MAPS_SRC))
+check('G2: both city attempts carry that point',
+  guardAttemptsCarryResolvedPoint(MAPS_SRC))
+check('G3: the Israeli single-attempt arm still uses the Israeli table, untouched',
+  guardIsraelArmUntouched(MAPS_SRC))
+check('G4: the third attempt is still gated on the Israeli table, so it never fires elsewhere',
+  guardThirdAttemptStillIsraeliTable(MAPS_SRC))
+check('G5: a failed city geocode does not fail the scan — the name is still sent',
+  /did not resolve to a point; sending the name only/.test(readFileSync('lib/scanner/google-maps.ts', 'utf8')))
+check('G1-MUT: resolving for the United States too fails G1',
+  !guardCityResolvedOutsideIlUs("if (country !== 'il') { geocodeAddress(effectiveCity, country) }"))
+check('G2-MUT: an attempt left on the old value fails G2',
+  !guardAttemptsCarryResolvedPoint('coordinates: resolvedCityCoordinates, coordinates: cityCoordinates,'))
+check('G4-MUT: gating the third attempt on the new value fails G4',
+  !guardThirdAttemptStillIsraeliTable('if (resolvedCityCoordinates) {'))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
