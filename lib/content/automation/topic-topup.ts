@@ -281,10 +281,22 @@ export interface TopUpSummary {
   thinPlans: number
   /** Projects of a non-paying owner whose own active queue was kept stocked (15 Nov 2026). */
   failures: number
+  /**
+   * PROJECTS WHOSE PUBLISH QUEUE IS AT ZERO — the number this log line exists for.
+   *
+   * A project below its target still publishes tomorrow; a project at zero does not
+   * publish at all, and the merchant is owed a count of articles a month. Measured in
+   * Production on 21 Nov 2026: three active pools were sitting at zero (their last
+   * queue item added 25 Sep, 3 Oct and 29 Oct) with 10 and 7 approved ideas waiting
+   * in two of them, and NOTHING in 24 hours of logs said so — the run line was
+   * printed only when something was promoted, a model batch ran, or a project threw,
+   * so the one state that needs an alarm was the one state that was silent.
+   */
+  dryQueues: number
 }
 
 const EMPTY = (state: TopUpSummary['state']): TopUpSummary =>
-  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, stalePlans: 0, thinPlans: 0, failures: 0 })
+  ({ state, projectsChecked: 0, notEntitled: 0, enough: 0, promoted: 0, queued: 0, skippedOverlap: 0, skippedOffSubject: 0, modelProjects: 0, modelIdeas: 0, stalePlans: 0, thinPlans: 0, failures: 0, dryQueues: 0 })
 
 function defaultDeps(admin: Admin): TopUpDeps {
   return {
@@ -582,7 +594,11 @@ export async function runTopicTopUp(
         planRhythm: ent.planRhythm ? { activeQueues: activeQueues.get(project.user_id) ?? 1, monthlyForThisSite } : null,
       })
       if (target === 0) { summary.enough++; continue }
-      if ((await countSupply(admin, scope, pool)) >= target) {
+      const supply = await countSupply(admin, scope, pool)
+      // Counted BEFORE the refill is attempted, so the number says how many queues
+      // were found empty, not how many were still empty when the pass gave up.
+      if (pool && supply === 0) summary.dryQueues++
+      if (supply >= target) {
         // The publish queue is covered. The IDEAS waiting for approval are a second,
         // independent target: a merchant who rejects what we prepared must still find
         // a month's worth to choose from. A rejected idea is never re-suggested (the
@@ -649,9 +665,17 @@ export async function runTopicTopUp(
     }
   }
 
-  if (summary.promoted > 0 || summary.modelProjects > 0 || summary.failures > 0) {
-    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures } = summary
-    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures })
+  // ONE LINE PER PASS THAT READ ANYTHING, whatever it decided.
+  //
+  // It used to print only when something was promoted, a model batch ran, or a
+  // project threw. That hid the only outcome worth an alarm: a pass that looked at
+  // every project, found publish queues at zero, and promoted nothing. On 21 Nov
+  // 2026 Production had three such queues and 24 hours of logs held not one
+  // `[topic-topup]` line, so there was no way to tell a healthy fleet from a stuck
+  // one. The cron's hourly pass gate makes this about eight lines a day.
+  if (summary.projectsChecked > 0) {
+    const { projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures, dryQueues } = summary
+    console.log('[topic-topup] run', { slot, projectsChecked, notEntitled, enough, promoted, queued, skippedOverlap, skippedOffSubject, modelProjects, modelIdeas, stalePlans, thinPlans, failures, dryQueues })
   }
   return summary
 }
