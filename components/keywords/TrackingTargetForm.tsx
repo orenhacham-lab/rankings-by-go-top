@@ -392,7 +392,7 @@ export default function TrackingTargetForm({
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label={locationMode === 'exact_point' ? 'Latitude *' : 'Latitude'}
+                label={locationMode === 'exact_point' ? `${t.latitudeLabel} *` : t.latitudeLabel}
                 name="exact_resolved_lat"
                 type="number"
                 step="0.000001"
@@ -405,7 +405,7 @@ export default function TrackingTargetForm({
                 required={locationMode === 'exact_point'}
               />
               <Input
-                label={locationMode === 'exact_point' ? 'Longitude *' : 'Longitude'}
+                label={locationMode === 'exact_point' ? `${t.longitudeLabel} *` : t.longitudeLabel}
                 name="exact_resolved_lng"
                 type="number"
                 step="0.000001"

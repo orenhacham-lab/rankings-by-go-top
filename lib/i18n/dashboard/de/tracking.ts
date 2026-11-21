@@ -43,6 +43,8 @@ export const trackingDe: DeepPartial<DashboardDictionary> = {
     locationModeGrid: 'Rasterkarte des Gebiets',
     gridCentreTitle: 'Mittelpunkt des Rasters',
     gridCentreHint: 'Das Raster wird um diesen Punkt gemessen. Hat das Projekt keine Stadt, sind hier eine Adresse oder Koordinaten erforderlich.',
+    latitudeLabel: 'Breitengrad',
+    longitudeLabel: 'Längengrad',
     gridSizeLabel: 'Rastergröße',
     gridSizeHint: (points: number) => `Jeder Scan misst ${points} Punkte rund um das Unternehmen und verbraucht ${points} Prüfungen Ihres Tarifs`,
     locationUsOnlyNote: 'Der Radius-Scan steht nur für Websites in den USA zur Verfügung',

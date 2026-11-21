@@ -46,6 +46,8 @@ function stripComments(src: string): string {
 const ROUTE_SRC = stripComments(readFileSync('app/api/scan/route.ts', 'utf8'))
 const SCHEDULER_SRC = stripComments(readFileSync('lib/scan-scheduler/process-scheduled-scan.ts', 'utf8'))
 const FORM_SRC = stripComments(readFileSync('components/keywords/TrackingTargetForm.tsx', 'utf8'))
+const PANEL_SRC = stripComments(readFileSync('components/keywords/ProjectKeywordsPanel.tsx', 'utf8'))
+const QUOTA_SRC = stripComments(readFileSync('lib/quota.ts', 'utf8'))
 const ACTIONS_SRC = stripComments(readFileSync('app/actions/tracking-targets.ts', 'utf8'))
 
 interface Seen { url: string; body?: Record<string, unknown> }
@@ -357,6 +359,27 @@ async function run() {
     !guardRouteSendsGridCentre("if (locationMode === 'exact_point') { exactPointInput = { lat, lng } }"))
   check('the no-throw guard fails if the grid were blocked like an exact point',
     !guardRouteDoesNotBlockGrid("if (locationMode === 'grid') { throw new Error('needs a centre') }"))
+
+  // ------------------------------- G. a refusal reaches the screen, no repeats
+  // Found on the preview: the quota payload names its kind in `code`, the panel
+  // matched `errorCode`, so a refused scan showed "failed, try again" (or nothing
+  // the reader could use). And a single save had no duplicate check at all.
+  console.log('\nG) the quota answer is shown, and a repeated save is refused')
+  const guardPayloadUsesCode = (src: string) => /return \{ error, errorEn, code, limit/.test(src)
+  const guardPanelReadsCode = (src: string) => /data\?\.code \?\? data\?\.errorCode/.test(src) && /startsWith\('QUOTA_'\)/.test(src)
+  const guardPanelPicksLanguage = (src: string) => /language === 'he' \? data\.error : data\.errorEn/.test(src)
+  const guardSingleSaveDedupes = (src: string) => /throw new UserFacingError\(m\.keywordExistsSameLocation\)/.test(src)
+  const guardLabelsLocalized = (src: string) => /t\.latitudeLabel/.test(src) && /t\.longitudeLabel/.test(src) && !/'Latitude/.test(src)
+  check('the quota payload carries its kind as `code`', guardPayloadUsesCode(QUOTA_SRC))
+  check('the panel reads that `code`, so a quota refusal is recognised', guardPanelReadsCode(PANEL_SRC))
+  check('the refusal is shown in the screen language, not always Hebrew', guardPanelPicksLanguage(PANEL_SRC))
+  check('a repeated single save is refused instead of duplicated', guardSingleSaveDedupes(ACTIONS_SRC))
+  check('the coordinate labels come from the dictionary', guardLabelsLocalized(FORM_SRC))
+  console.log('\nG-MUT) mutation controls')
+  check('the panel guard fails on the old errorCode-only match', !guardPanelReadsCode("data?.errorCode === 'QUOTA_KEYWORD_CHECKS' && data.error"))
+  check('the language guard fails on the old Hebrew-only return', !guardPanelPicksLanguage('return data.error'))
+  check('the dedupe guard fails when the check is removed', !guardSingleSaveDedupes('insert(data)'))
+  check('the label guard fails on a hard-coded English label', !guardLabelsLocalized("label=\"Latitude *\""))
 
   if (prevSerper === undefined) delete process.env.SERPER_API_KEY; else process.env.SERPER_API_KEY = prevSerper
   if (prevGeoKey !== undefined) process.env.GOOGLE_GEOCODING_API_KEY = prevGeoKey

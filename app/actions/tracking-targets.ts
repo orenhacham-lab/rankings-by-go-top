@@ -304,6 +304,24 @@ export async function createTrackingTargetAction(formData: FormData) {
     data.radius_miles = null
   }
 
+  // A second identical keyword (same words, engine, mode and place) is a
+  // repeated click or a retry after a slow response, never something asked for:
+  // bulk entry already skips these, the single path did not.
+  const { data: sameKeyword } = await supabase
+    .from('tracking_targets')
+    .select('keyword, engine_type, location_mode, custom_city, postal_code, exact_resolved_lat, exact_resolved_lng')
+    .eq('project_id', projectId)
+    .eq('engine_type', String(data.engine_type))
+    .eq('location_mode', locationMode)
+  const norm = (v: unknown) => (v == null ? '' : String(v).trim().toLowerCase())
+  const same = (sameKeyword || []).some((r) =>
+    norm(r.keyword) === norm(data.keyword) &&
+    norm(r.custom_city) === norm(data.custom_city) &&
+    norm(r.postal_code) === norm(data.postal_code) &&
+    norm(r.exact_resolved_lat) === norm((data as Record<string, unknown>).exact_resolved_lat) &&
+    norm(r.exact_resolved_lng) === norm((data as Record<string, unknown>).exact_resolved_lng))
+  if (same) throw new UserFacingError(m.keywordExistsSameLocation)
+
   const { error } = await supabase.from('tracking_targets').insert(data)
 
   // If exact_point columns don't exist (migration not applied), retry without them

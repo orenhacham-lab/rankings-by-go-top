@@ -46,6 +46,8 @@ export const trackingPl: DeepPartial<DashboardDictionary> = {
     locationModeGrid: 'Mapa siatki obszaru',
     gridCentreTitle: 'Środek siatki',
     gridCentreHint: 'Siatka jest mierzona wokół tego punktu. Jeśli projekt nie ma miasta, adres albo współrzędne są tu obowiązkowe.',
+    latitudeLabel: 'Szerokość geograficzna',
+    longitudeLabel: 'Długość geograficzna',
     gridSizeLabel: 'Rozmiar siatki',
     gridSizeHint: (points: number) => `Każde skanowanie mierzy ${points} punktów wokół firmy i zużywa ${points} sprawdzeń z Państwa planu`,
     locationUsOnlyNote: 'Skanowanie promieniowe jest dostępne tylko dla stron w USA',

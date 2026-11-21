@@ -2534,6 +2534,8 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     locationModeGrid: 'Mapa de cuadrícula de la zona',
     gridCentreTitle: 'Centro de la cuadrícula',
     gridCentreHint: 'La cuadrícula se mide alrededor de este punto. Si el proyecto no tiene ciudad, aquí hace falta una dirección o unas coordenadas.',
+    latitudeLabel: 'Latitud',
+    longitudeLabel: 'Longitud',
     gridSizeLabel: 'Tamaño de la cuadrícula',
     gridSizeHint: (points: number) => `Cada escaneo mide ${points} puntos alrededor del negocio y consume ${points} comprobaciones de tu plan`,
     locationUsOnlyNote: 'El escaneo por radio solo está disponible para webs de Estados Unidos',

@@ -44,6 +44,8 @@ export const trackingNl: DeepPartial<DashboardDictionary> = {
     locationModeGrid: 'Rasterkaart van het gebied',
     gridCentreTitle: 'Middelpunt van het raster',
     gridCentreHint: 'Het raster wordt rond dit punt gemeten. Heeft het project geen stad, dan zijn hier een adres of coördinaten verplicht.',
+    latitudeLabel: 'Breedtegraad',
+    longitudeLabel: 'Lengtegraad',
     gridSizeLabel: 'Rastergrootte',
     gridSizeHint: (points: number) => `Elke scan meet ${points} punten rond het bedrijf en gebruikt ${points} controles uit uw pakket`,
     locationUsOnlyNote: 'De radiusscan is alleen beschikbaar voor websites in de VS',

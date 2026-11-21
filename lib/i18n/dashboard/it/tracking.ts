@@ -37,6 +37,8 @@ export const trackingIt: DeepPartial<DashboardDictionary> = {
     locationModeGrid: 'Mappa a griglia della zona',
     gridCentreTitle: 'Centro della griglia',
     gridCentreHint: 'La griglia è misurata attorno a questo punto. Se il progetto non ha una città, qui sono obbligatori un indirizzo o delle coordinate.',
+    latitudeLabel: 'Latitudine',
+    longitudeLabel: 'Longitudine',
     gridSizeLabel: 'Dimensione della griglia',
     gridSizeHint: (points: number) => `Ogni scansione misura ${points} punti attorno all'attività e consuma ${points} controlli del suo piano`,
     locationUsOnlyNote: 'La scansione per raggio è disponibile soltanto per i siti statunitensi',

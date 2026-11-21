@@ -37,6 +37,8 @@ export const trackingFr: DeepPartial<DashboardDictionary> = {
     locationModeGrid: 'Carte en grille de la zone',
     gridCentreTitle: 'Centre de la grille',
     gridCentreHint: 'La grille est mesurée autour de ce point. Si le projet n’a pas de ville, une adresse ou des coordonnées sont obligatoires ici.',
+    latitudeLabel: 'Latitude',
+    longitudeLabel: 'Longitude',
     gridSizeLabel: 'Taille de la grille',
     gridSizeHint: (points: number) => `Chaque analyse mesure ${points} points autour de l'établissement et consomme ${points} vérifications de votre forfait`,
     locationUsOnlyNote: 'Le balayage par rayon est réservé aux sites américains',

@@ -4578,6 +4578,8 @@ export const dashboardHe = {
     locationModeGrid: 'מפת גריד של האזור',
     gridCentreTitle: 'מרכז הגריד',
     gridCentreHint: 'הגריד נמדד סביב הנקודה הזאת. אם אין עיר מוגדרת בפרויקט, חובה להזין כאן כתובת או קואורדינטות.',
+    latitudeLabel: 'קו רוחב',
+    longitudeLabel: 'קו אורך',
     gridSizeLabel: 'גודל הגריד',
     gridSizeHint: (points: number) => `כל סריקה מודדת ${points} נקודות סביב העסק, ומנצלת ${points} בדיקות מהמכסה`,
     locationUsOnlyNote: 'סריקת רדיוס זמינה לפרויקטים בארה"ב בלבד',

@@ -37,6 +37,8 @@ export const trackingPtBR: DeepPartial<DashboardDictionary> = {
     locationModeGrid: 'Mapa em grade da região',
     gridCentreTitle: 'Centro da grade',
     gridCentreHint: 'A grade é medida em volta deste ponto. Se o projeto não tiver cidade, é obrigatório informar aqui um endereço ou coordenadas.',
+    latitudeLabel: 'Latitude',
+    longitudeLabel: 'Longitude',
     gridSizeLabel: 'Tamanho da grade',
     gridSizeHint: (points: number) => `Cada varredura mede ${points} pontos ao redor do negócio e consome ${points} verificações do seu plano`,
     locationUsOnlyNote: 'A varredura por raio só está disponível para sites dos Estados Unidos',
