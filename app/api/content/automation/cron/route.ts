@@ -109,6 +109,7 @@ import { runIsolatedOnboardingEmails } from '@/lib/onboarding-emails/isolated'
 import { runIsolatedWeeklySummaries } from '@/lib/reports/weekly/isolated'
 import { checkPublishingStalls, isDailyStallCheckRun } from '@/lib/content/automation/stall-watch'
 import { claimAutomationPass, isUngatedScheduler } from '@/lib/content/automation/pass-gate'
+import { runIsolatedShopifySeoBackfill } from '@/lib/shopify/seo-backfill-isolated'
 import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
 import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
 import { runIsolatedGbpDue } from '@/lib/gbp/due-isolated'
@@ -261,6 +262,12 @@ async function handle(request: Request): Promise<Response> {
     // article ever, and never leaving an article without a cover. It ends by
     // itself. Production only, isolated: it never throws.
     await runIsolatedBlogCoverRepair(undefined, { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 })
+    // Then the search-engine listing of articles already on merchants' Shopify
+    // blogs that never got one: every Shopify publish before 21 Nov 2026 sent no
+    // SEO field at all (lib/shopify/seo-backfill.ts). Ten articles a pass, each
+    // one read before it is written and the merchant's own value never replaced.
+    // It ends by itself. Production only, isolated: it never throws.
+    await runIsolatedShopifySeoBackfill(undefined, { startedAtMs: Date.parse(startedAt), maxDurationMs: maxDuration * 1000 })
     // Last of all, and off unless REMINDER_EMAILS_ENABLED is "true": the reminder email for
     // articles waiting for approval (lib/reminders). Isolated; it never throws or rejects.
     await runIsolatedReminders()
