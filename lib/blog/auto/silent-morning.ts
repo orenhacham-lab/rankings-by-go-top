@@ -40,8 +40,21 @@ type Admin = ReturnType<typeof createAdminClient>
 
 /** The hour after the window closes, UTC. */
 export const SILENCE_CHECK_HOUR_UTC = Math.max(...WINDOW_HOURS_UTC) + 1
-/** Only the first cron slot of that hour, so the check runs once a day. */
-export const SILENCE_CHECK_BEFORE_MINUTE = 15
+/**
+ * The first HALF of that hour, not its first quarter.
+ *
+ * It was 15, for the first of the four cron slots in an hour. Since PR 472 the
+ * pass gate lets ONE call an hour through, and a scheduler that fires "every
+ * fifteen minutes" drifts: the real passes on 21 November landed at :15, :16,
+ * :17, :18. Every one of those is past a cutoff of 15, so the day's silence
+ * check had stopped running at all — the alert for a morning that published
+ * nothing was itself silent.
+ *
+ * Thirty keeps the guarantee that made it 15. Two passes could only both land
+ * under it if they were less than thirty minutes apart, and the gate holds the
+ * window for fifty, so at most one check is ever made in the hour.
+ */
+export const SILENCE_CHECK_BEFORE_MINUTE = 30
 
 export type SilenceVerdict =
   | { check: false; reason: 'wrong_hour' | 'already_past_first_slot' }

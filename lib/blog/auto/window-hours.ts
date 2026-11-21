@@ -25,15 +25,42 @@
  * and that an ELEVENTH language should come with the seventh hour rather than
  * after it.
  *
- * KOREAN is that eleventh language, so the seventh hour comes with it:
- * 04:00-10:59 UTC = 07:00-13:59 Israel, twenty-eight runs, eleven first passes
- * and seventeen of reserve. The last hour is still a reserve for retries and
- * not a later publishing time — a morning that goes well is finished long
- * before it. The number to watch is the reserve, not the count of languages: it
+ * KOREAN is that eleventh language, so the seventh hour came with it:
+ * 04:00-10:59 UTC, twenty-eight runs, eleven first passes and seventeen of
+ * reserve. The number to watch is the reserve, not the count of languages: it
  * must hold at least one retry per language, which is what J18 in
  * lib/blog/auto/__qa__/blog-auto.qa.ts asserts.
+ *
+ * THAT ARITHMETIC NO LONGER HOLDS; see the note on the constant below.
  */
-export const WINDOW_HOURS_UTC: readonly number[] = [4, 5, 6, 7, 8, 9, 10]
+/**
+ * TWELVE HOURS, from 21 November 2026, because the hour stopped being four runs.
+ *
+ * Everything above counts an hour as FOUR chances, which it was while
+ * cron-job.org's quarter-hour call reached the blog. PR 472 put a pass gate in
+ * front of that call to hold down Vercel CPU after the Hobby overrun, and the
+ * gate returns 202 BEFORE `after()`, where the blog window is started. So a
+ * gated call never reaches the blog at all, and an hour became ONE chance.
+ *
+ * The window did not change, so seven hours stopped being twenty-eight runs and
+ * became seven, for eleven languages. The measurement is unambiguous — articles
+ * a day: 15 Nov 11, 16 Nov 10, 17 Nov 9, then 18 Nov 5, 19 Nov 3, 20 Nov 5,
+ * 21 Nov 5. PR 472 merged on the evening of 17 November.
+ *
+ * TWELVE AND NOT ELEVEN. Eleven hours for eleven languages is exact, and exact
+ * means a language that loses its hour to the quality gate loses its day: that
+ * is what 19 November's three articles look like. The twelfth hour is the
+ * reserve, in the way the fourth run of each hour used to be.
+ *
+ * It costs no CPU. Those hourly passes already run — the blog was simply not
+ * allowed to use them — which is why this is the fix rather than exempting the
+ * blog from the gate, with Vercel Pro due to be dropped at the end of the month.
+ *
+ * 04:00-15:59 UTC = 07:00-18:59 Israel. The number to watch is still the
+ * reserve, now one hour rather than seventeen runs; if a language loses a day
+ * again, the next move is to stop a refused language consuming its whole hour.
+ */
+export const WINDOW_HOURS_UTC: readonly number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 /** Midnight UTC of the day `nowMs` falls in. */
 export function startOfUtcDay(nowMs: number): string {
