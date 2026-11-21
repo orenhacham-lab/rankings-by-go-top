@@ -339,7 +339,24 @@ async function querySerperMaps(
   }
 }
 
-function findBusinessMatch(places: SerperMapsPlace[], targetName: string, targetDomain?: string | null): SerperMapsPlace | null {
+/**
+ * The parts of a Google Maps title that is written "Name - description" or
+ * "Name | description". Businesses in Israel in particular carry a tagline, so
+ * the title Google returns is "Royal Barber Studio - רויאל מספרה" for a business
+ * its owner calls "Royal Barber Studio". Split on a SPACED separator only, so a
+ * hyphen inside a word ("Coca-Cola", "Tel-Aviv") never splits a name.
+ */
+export function titleSegments(title: string): string[] {
+  return title
+    .split(/\s+[-–—|•·:]\s+|\s*\|\s*/)
+    .map((part) => normalizeBusinessName(part))
+    .filter((part) => part.length > 0)
+}
+
+/** A target name this short would match too many unrelated segments. */
+const SEGMENT_MATCH_MIN_LENGTH = 4
+
+export function findBusinessMatch(places: SerperMapsPlace[], targetName: string, targetDomain?: string | null): SerperMapsPlace | null {
   const normalizedTarget = normalizeBusinessName(targetName)
   console.log('[Maps:matching] findBusinessMatch looking for:', { targetName, normalizedTarget, targetDomain: targetDomain || '(not provided)' })
 
@@ -383,6 +400,20 @@ function findBusinessMatch(places: SerperMapsPlace[], targetName: string, target
         return place
       } else {
         console.log(`[Maps:matching]     ✗ Similarity ${similarity.toFixed(2)} < 0.90 - REJECTED`)
+      }
+    }
+  }
+
+  // PRIORITY 4 — runs ONLY when nothing above matched, so a business that was
+  // found before is found at exactly the same place as before: the target name
+  // equals one WHOLE segment of a "Name - tagline" title. Equality of a whole
+  // segment, never a substring and never a similarity, so "Royal Barber Studio"
+  // matches "Royal Barber Studio - רויאל מספרה" but not "The Royal Barber".
+  if (normalizedTarget.length >= SEGMENT_MATCH_MIN_LENGTH) {
+    for (const place of places) {
+      if (titleSegments(place.title).length > 1 && titleSegments(place.title).includes(normalizedTarget)) {
+        console.log(`[Maps:matching]     ✓ SEGMENT MATCH: "${place.title}" has a segment equal to "${normalizedTarget}"`)
+        return place
       }
     }
   }
