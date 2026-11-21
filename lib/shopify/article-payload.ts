@@ -58,6 +58,70 @@ export interface ShopifyArticleInputArgs {
   /** Featured image (must be a stable public https URL) + alt text. */
   imageUrl?: string | null
   imageAlt?: string | null
+  /** The article's own search-engine listing, as the generator wrote it. */
+  metaTitle?: string | null
+  metaDescription?: string | null
+  /**
+   * What the merchant's article ALREADY has in `global.title_tag` /
+   * `global.description_tag`, as the reconcile read found it. Update mode only,
+   * and a value here means ours is NOT sent for that field.
+   */
+  existingSeoTitle?: string | null
+  existingSeoDescription?: string | null
+}
+
+/**
+ * The two metafields Shopify documents as a resource's search engine listing.
+ * An Article has no `seo` field — `SEOInput` exists for Product and Collection
+ * only — so the listing is these metafields, in the `global` namespace, typed
+ * `single_line_text_field`:
+ * https://shopify.dev/docs/apps/build/marketing/optimize-storefront-seo
+ *
+ * Same namespace, keys and type as `lib/site-fix/shopify-admin.ts` reads and
+ * writes for pages and products, so the two halves of the product agree about
+ * where a merchant's SEO title lives.
+ */
+export const SEO_METAFIELD_NAMESPACE = 'global'
+export const SEO_TITLE_METAFIELD_KEY = 'title_tag'
+export const SEO_DESCRIPTION_METAFIELD_KEY = 'description_tag'
+export const SEO_METAFIELD_TYPE = 'single_line_text_field'
+
+/** A metafield write, or null when there is nothing to write for that field. */
+function seoMetafield(key: string, value: string | null | undefined): Record<string, string> | null {
+  const v = (value || '').trim()
+  if (!v) return null
+  return { namespace: SEO_METAFIELD_NAMESPACE, key, type: SEO_METAFIELD_TYPE, value: v }
+}
+
+/**
+ * The `metafields` entries that carry the article's SEO title and meta
+ * description — the gap this closes: every article ever published to a Shopify
+ * blog from here went up with NO search-engine listing of its own, so Shopify
+ * fell back to the article title and the first words of the body, while the
+ * same article published to WordPress got both fields written and verified.
+ *
+ * TWO RULES, and they are the whole function:
+ *
+ *   CREATE  — send what we have. There is nothing of the merchant's to protect:
+ *             the article does not exist yet.
+ *   UPDATE  — send a field ONLY where the merchant's stored value is empty. A
+ *             title somebody typed into Shopify's "Edit website SEO" panel is
+ *             theirs, and a re-export must not quietly replace it. This is the
+ *             same rule the WordPress backfill states as "NEVER REPLACE A VALUE
+ *             THAT IS ALREADY THERE" (lib/content/seo-backfill.ts).
+ *
+ * PURE.
+ */
+export function buildSeoMetafields(args: Pick<ShopifyArticleInputArgs,
+  'mode' | 'metaTitle' | 'metaDescription' | 'existingSeoTitle' | 'existingSeoDescription'>,
+): Record<string, string>[] {
+  const keepTitle = args.mode === 'update' && !!(args.existingSeoTitle || '').trim()
+  const keepDescription = args.mode === 'update' && !!(args.existingSeoDescription || '').trim()
+  const out = [
+    keepTitle ? null : seoMetafield(SEO_TITLE_METAFIELD_KEY, args.metaTitle),
+    keepDescription ? null : seoMetafield(SEO_DESCRIPTION_METAFIELD_KEY, args.metaDescription),
+  ]
+  return out.filter((m): m is Record<string, string> => m !== null)
 }
 
 /**
@@ -121,6 +185,10 @@ export function buildArticleInput(args: ShopifyArticleInputArgs): Record<string,
   if (args.imageUrl && isStableImageUrl(args.imageUrl)) {
     input.image = { url: args.imageUrl, altText: (args.imageAlt || '').trim() || undefined }
   }
+  // The search-engine listing. Omitted entirely when there is nothing to write,
+  // because an empty `metafields: []` is one more field for Shopify to reject.
+  const metafields = buildSeoMetafields(args)
+  if (metafields.length) input.metafields = metafields
   return input
 }
 

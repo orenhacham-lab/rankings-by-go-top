@@ -307,6 +307,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'www.w3.org': 'XML and sitemap namespaces written into markup; not fetched',
     'llmstxt.org': 'the llms.txt specification, named in generated files; not fetched',
     'developers.google.com': 'a documentation link shown to the owner',
+    'shopify.dev': 'a documentation link in a source comment, naming where the SEO metafield convention is specified; never fetched and never sent anything',
     // Creem is now a payment provider and api.creem.io is in RECIPIENTS above,
     // which is what made this guard demand the disclosure before the integration
     // could merge. These two hosts are the other kind: text a reader is pointed
