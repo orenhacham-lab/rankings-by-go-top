@@ -88,6 +88,20 @@ const PERCENT = /\d[\d.,]*\s*(%|אחוז(?:ים)?|percent|por\s?ciento|por\s?cen
 const COUNT_AFTER = /\d[\d.,]*\s*\+?\s*(לקוחות|מנויים|עסקים|customers|clients|subscribers|businesses|clientes|suscriptores|negocios|assinantes|empresas|neg[óo]cios|abonn[ée]s|entreprises|clienti|abbonati|aziende|imprese|kunden|abonnenten|unternehmen|firmen|klanten|abonnees|bedrijven|klient(?:ów|y|ami)|klienci|abonent(?:ów|i)|firm(?:y|ę)?|przedsi[ęe]biorstw(?:a|)|顧客|ユーザー|企業|社)/i
 const COUNT_BEFORE = /(לקוחות|מנויים|customers|clients|clientes|clienti|kunden|klanten|klienci|顧客)\s*[:–-]?\s*\d/i
 const CADENCE = /(מעקב|בדיקה|סריקה)\s+(יומי|יומית|שבועי|שבועית)|(daily|weekly)\s+(tracking|rank\s*check|scan)|seguimiento\s+(diario|semanal)|(acompanhamento|monitoramento|verifica[çc][ãa]o|varredura)\s+(di[áa]ri[ao]|semanal)|(suivi|scan)\s+(?:de\s+positionnement\s+)?(quotidien(?:ne)?|hebdomadaire)|(monitoraggio|scansione)\s+(?:del\s+posizionamento\s+)?(giornalier[oa]|settimanale)|(t[äa]glich(?:e|es|er|en)?|w[öo]chentlich(?:e|es|er|en)?)\s+([ÜU]berwachung|Tracking|Ranking|Scan|Rangverfolgung)|(dagelijkse?|wekelijkse?)\s+(monitoring|tracking|scan)|(codzienne?|cotygodniowe?|codzienny|cotygodniowy)\s+(monitorowanie|[śs]ledzenie|skanowanie)|(毎日|毎週|日次|週次)[^。]{0,8}(追跡|計測|スキャン|順位)/i
+/**
+ * DAILY OR WEEKLY TRACKING OF THE READER'S AD SPEND IS NOT A CLAIM ABOUT OURS.
+ *
+ * Measured 22 November 2026: the Hebrew row "בדיקת מילות מפתח" was refused three
+ * times and parked as failed, on a sentence that advised the reader to do
+ * "מעקב יומי או שבועי אחר תקציב ועלות לקליק" — to watch their own advertising
+ * budget and cost per click. Nothing in it says how often WE track anything.
+ * The rule exists because the automatic position tracking runs monthly; a
+ * sentence whose object is a budget or a cost per click is about something else.
+ * Only that exact shape is exempt: the cadence word must be followed by "אחר"
+ * and a money word, so "מעקב יומי אחר מיקומים" still refuses.
+ */
+const AD_SPEND_CADENCE = /(?:מעקב|בדיקה|סריקה)\s+(?:יומי|יומית|שבועי|שבועית)(?:\s+או\s+(?:יומי|יומית|שבועי|שבועית))?\s+אחר\s+(?:ה)?(?:תקציב|עלות|עלויות|הוצאות|הוצאה|קליקים|קליק)/g
+const withoutAdSpendCadence = (text: string): string => text.replace(AD_SPEND_CADENCE, ' ')
 const OTHER_ENGINES = /perplexity|copilot|grok/i
 /**
  * HOW AN HONEST ARTICLE ACTUALLY DRAWS THE LINE.
@@ -299,7 +313,15 @@ export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
   if (COUNT_AFTER.test(all) || COUNT_BEFORE.test(all)) {
     refuseMatch('customer_count_claim', firstMatch(COUNT_AFTER) ?? firstMatch(COUNT_BEFORE))
   }
-  if (CADENCE.test(all)) refuseMatch('tracking_cadence_claim', firstMatch(CADENCE))
+  if (CADENCE.test(withoutAdSpendCadence(all))) {
+    let hit: { sentence: string; at: number } | undefined
+    for (const line of lines) {
+      const clean = withoutAdSpendCadence(line)
+      const m = CADENCE.exec(clean)
+      if (m) { hit = { sentence: clean, at: m.index }; break }
+    }
+    refuseMatch('tracking_cadence_claim', hit)
+  }
   if (RATING.test(all)) refuseMatch('rating_claim', firstMatch(RATING))
   for (const line of lines) {
     const at = promiseIndex(line)

@@ -31,7 +31,7 @@ import { researchKeywords, selectKeywords } from '@/lib/blog/auto/keyword-plan'
 import { createBlogCover } from '@/lib/blog/auto/cover'
 import {
   addPlanRows, claimNextPlanRow, countPlanned, publishPlanArticle, readInternalTargets,
-  readTakenKeywords, recoverStaleLocks, releasePlanRow, MAX_ATTEMPTS,
+  readTakenKeywords, recoverStaleLocks, releasePlanRow, resolveFreeSlug, MAX_ATTEMPTS,
 } from '@/lib/blog/auto/store'
 import { withArticleWidgets } from '@/lib/blog/auto/widgets'
 import { withBodyLinks, checkBodyLinks } from '@/lib/blog/auto/body-links'
@@ -141,8 +141,10 @@ export async function runBlogAutoPublish(
     return summary
   }
 
-  const fail = async (reason: string): Promise<BlogAutoSummary> => {
-    await releasePlanRow(admin, row.id, reason, row.attempts ?? MAX_ATTEMPTS)
+  // `park` ends the row at once instead of handing it back for another try: for
+  // a refusal that a retry would only repeat, such as a topic already written.
+  const fail = async (reason: string, park = false): Promise<BlogAutoSummary> => {
+    await releasePlanRow(admin, row.id, reason, park ? MAX_ATTEMPTS : row.attempts ?? MAX_ATTEMPTS)
     summary.failure = reason
     summary.durationMs = Date.now() - started
     return summary
@@ -205,8 +207,13 @@ export async function runBlogAutoPublish(
   const links = checkBodyLinks(linked)
   if (!links.ok) return fail(`links:${links.failures.join(',')}`)
 
+  // Settled BEFORE the cover, which is the expensive half (lib/blog/auto/store.ts).
+  const free = await resolveFreeSlug(admin, generated.slug, locale)
+  if (!free.ok) return fail(`publish:${free.reason}`, true)
+  const slug = free.slug
+
   const cover: CoverResult = await deps.cover(admin, {
-    slug: generated.slug,
+    slug,
     title: generated.article.title,
     topic: row.topic,
     imagePrompt: generated.article.imagePrompt || null,
@@ -217,7 +224,7 @@ export async function runBlogAutoPublish(
   const published = await publishPlanArticle(admin, row.id, {
     locale,
     title: generated.article.title,
-    slug: generated.slug,
+    slug,
     excerpt: generated.article.excerpt,
     metaTitle: generated.article.metaTitle,
     metaDescription: generated.article.metaDescription,
