@@ -111,6 +111,8 @@ const ELEVENLABS_DOCS = 'https://elevenlabs.io/docs/bots'
 const QUALIFIED_DOCS = 'https://www.qualified.com/legal/qualified-crawler-user-agent'
 const DIFFBOT_DOCS = 'https://www.diffbot.com/docs/crawl/faq/robots-txt'
 const HAIKU_DOCS = 'https://www.haiku.fr/robots-doc'
+const PARALLEL_DOCS = 'https://parallel.ai/parallel-web-systems-bots'
+const HARK_DOCS = 'https://app.hark.com/about/bot'
 const EXA_DOCS = 'https://crawler.exa.ai/'
 const LINER_DOCS = 'https://liner-user.liner.com/docs/linerbot'
 const AMAZON_Q_DOCS =
@@ -190,6 +192,14 @@ const READ_ON_NOV20 = '2026-11-20'
 // foundation models at all. The row was wrong on the day it was written, from
 // a page nobody could read back. It is now `search`, and a dated negative that
 // had stood for three weeks is gone with it.
+// 22.11.2026: Parallel and Hark, from the leftovers of the same agent-directory
+// pass. Two of the other names on that list were chased and left out for a
+// reason worth keeping: Poggio's robots page now says the company was acquired
+// by Baseten on 01.10.2026 and the product is no longer supported, so there is
+// nothing living to document, and use.ai's page cannot be reached from the
+// container at all (the proxy reports no route to the host), so it is neither
+// confirmed nor denied. READ_ON_NOV22 carries today's date for these rows.
+const READ_ON_NOV22 = '2026-11-22'
 const READ_ON_NOV21 = '2026-11-21'
 
 export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
@@ -504,6 +514,40 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
     note: 'The robot used for a direct request from a Haiku user. Haiku states that it is not used to explore the web automatically nor for generative AI training, that it does not record information from third-party sites when a request comes from a user, and that its search follows a whitelist policy and is not a general search engine. It recommends that a site wanting to appear in those results authorise Haiku-SearchBot in robots.txt. Haiku also documents that it subcontracts some web search to Google, and relies on the Googlebot rules for that path.',
   },
 
+  // ── Parallel ──────────────────────────────────────────────────────────────
+  {
+    token: 'ShapBot',
+    operator: 'Parallel Web Systems',
+    purpose: 'search',
+    crawls: true,
+    respectsRobots: true,
+    docs: PARALLEL_DOCS,
+    verified: READ_ON_NOV22,
+    note: 'Builds and maintains the search index behind Parallel\u2019s web APIs, and Parallel notes that restricting it reduces a site\u2019s visibility through them. It follows the group naming ShapBot, or the * group when none does, reflects robots.txt changes within about a day, honours crawl-delay, and pauses on a 429 or 503 carrying Retry-After. It signs its requests under Web Bot Auth, with keys published at shapbot.parallel.ai.',
+  },
+  {
+    token: 'Shap-User',
+    operator: 'Parallel Web Systems',
+    purpose: 'answer',
+    crawls: true,
+    respectsRobots: false,
+    docs: PARALLEL_DOCS,
+    verified: READ_ON_NOV22,
+    note: 'Identifies itself when Parallel retrieves content at a user\u2019s direction, and is not used to crawl the web automatically. Parallel states that it is intended to provide visibility to content owners rather than to be managed through automated controls, and sends anyone who wants to control automated crawling to ShapBot instead \u2014 so a robots.txt rule for this token is a statement of preference, and Parallel does not promise to act on it. Its requests are signed under Web Bot Auth, with keys at shap-user.parallel.ai.',
+  },
+
+  // ── Hark ──────────────────────────────────────────────────────────────────
+  {
+    token: 'HarkBot',
+    operator: 'Hark Labs',
+    purpose: 'agent',
+    crawls: true,
+    respectsRobots: false,
+    docs: HARK_DOCS,
+    verified: READ_ON_NOV22,
+    note: 'An agent that browses on behalf of a signed-in Hark user, for research, form-filling and account actions on services that user already has access to, one request per tool invocation. Hark states that it is not a search crawler and does not index the web, build datasets or train models on what it fetches. Its page never mentions robots.txt: the controls it offers are signed requests (Web Bot Auth, Ed25519), published IP ranges, a listing in Cloudflare\u2019s verified-bot directory, and a way to ask for a blocklist entry, so this row states no robots.txt commitment.',
+  },
+
   // ── Moonshot AI (Kimi) ────────────────────────────────────────────────────
   // One operator page, three tokens, and the operator itself separates the
   // corpus from the index from the fetch a person waits for.
@@ -644,7 +688,7 @@ export const AI_CRAWLER_CANDIDATES: readonly DatasetCandidate[] = [
 ] as const
 
 /** Bumped whenever a row changes, so a consumer can cache on it. */
-export const AI_CRAWLER_DATASET_VERSION = '2026.11.21'
+export const AI_CRAWLER_DATASET_VERSION = '2026.11.22'
 
 export const AI_CRAWLER_DATASET_LICENSE = {
   id: 'CC-BY-4.0',
