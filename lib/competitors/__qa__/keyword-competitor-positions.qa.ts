@@ -833,7 +833,12 @@ async function main() {
     const G = {
       /** Written once, only after this check's own row is in, under that row's checked_at. */
       routeAfterOwnRow: (s: string) => {
-        const insert = s.indexOf(".from('scan_results').insert(resultData)")
+        // The route's own insert now also reads the new row's id back (the geo
+        // grid's points are stored under it), so it is a multi-line chain
+        // rather than one call. What this guard is about is unchanged: the
+        // competitor rows come after that insert succeeded, once, under its
+        // own checked_at.
+        const insert = s.indexOf('.insert(resultData)')
         const thrown = s.indexOf('throw new Error(`scan_results_insert_failed:', insert)
         const record = s.indexOf('recordCompetitorPositions(admin', insert)
         return insert > 0 && thrown > insert && record > thrown && count(s, 'recordCompetitorPositions(admin') === 1

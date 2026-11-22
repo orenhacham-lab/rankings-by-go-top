@@ -11,6 +11,8 @@ import { TrackingTarget, LocationMode } from '@/lib/supabase/types'
 import { saveTrackingTargetsAction } from '@/app/actions/tracking-targets'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { postalCodeIsLocatable, postalRules, sanitizePostalInput } from '@/lib/scanner/postal-input'
+import { GRID_DIMENSIONS, DEFAULT_GRID_SIZE, gridPointCount, type GridSize } from '@/lib/scanner/grid-scan'
 
 interface TrackingTargetFormProps {
   target?: TrackingTarget
@@ -47,6 +49,7 @@ export default function TrackingTargetForm({
   )
   const [customCity, setCustomCity] = useState(target?.custom_city || '')
   const [postalCode, setPostalCode] = useState(target?.postal_code || '')
+  const [gridSize, setGridSize] = useState<GridSize>(target?.grid_size || DEFAULT_GRID_SIZE)
   const [radiusCenterZip, setRadiusCenterZip] = useState(target?.radius_center_zip || '')
   const [radiusMiles, setRadiusMiles] = useState<number>(target?.radius_miles || 5)
   const [bulkMode, setBulkMode] = useState(false)
@@ -72,6 +75,14 @@ export default function TrackingTargetForm({
     return pattern.test(city.trim())
   }
 
+  // exact_point and grid both resolve a centre point. Grid may also inherit the
+  // project city, so its centre is optional; exact_point's is required.
+  const isCentreMode = locationMode === 'exact_point' || locationMode === 'grid'
+  const hasCentreInput =
+    exactSubMode === 'coords'
+      ? exactLat.trim() !== '' || exactLng.trim() !== ''
+      : exactAddress.trim() !== ''
+
   const customCityDiffers =
     locationMode === 'custom' &&
     customCity.trim() !== '' &&
@@ -87,7 +98,8 @@ export default function TrackingTargetForm({
     // Validate US city format if needed
     if (projectCountry?.toUpperCase() === 'US') {
       // Project city must be in "City, ST" format (not required for exact_point)
-      if (locationMode !== 'exact_point' && (!projectCity || !validateUSCityFormat(projectCity))) {
+      const centreCoversCity = locationMode === 'exact_point' || (isCentreMode && hasCentreInput)
+      if (!centreCoversCity && (!projectCity || !validateUSCityFormat(projectCity))) {
         setError(t.errorUsCity)
         return
       }
@@ -114,8 +126,10 @@ export default function TrackingTargetForm({
       }
     }
 
-    // exact_point: client-side guardrail. Real blocking validation happens server-side.
-    if (locationMode === 'exact_point') {
+    // exact_point / grid: client-side guardrail. Real blocking validation happens server-side.
+    // For grid the centre is optional (the project city can stand in), so only a
+    // partially filled centre is rejected here.
+    if (isCentreMode && (locationMode === 'exact_point' || hasCentreInput)) {
       if (exactSubMode === 'coords') {
         const lat = parseFloat(exactLat)
         const lng = parseFloat(exactLng)
@@ -251,23 +265,21 @@ export default function TrackingTargetForm({
           name="location_mode"
           value={locationMode}
           onChange={(e) => {
-            const mode = e.target.value as LocationMode
-            // Reset to 'project' if trying to select disabled ZIP mode
-            if (mode === 'zip' && projectCountry?.toUpperCase() !== 'US') {
-              return
-            }
-            setLocationMode(mode)
+            setLocationMode(e.target.value as LocationMode)
           }}
           options={[
             { value: 'project', label: `${t.locationModeProject}${projectCity ? ` (${projectCity})` : ''}` },
             { value: 'custom', label: t.locationModeCustom },
-            ...(projectCountry?.toUpperCase() === 'US'
-              ? [
-                  { value: 'zip', label: t.locationModeZip },
-                  { value: 'radius', label: t.locationModeRadius },
-                  { value: 'exact_point', label: t.locationModeExactPoint },
-                ]
-              : []),
+            // Exact point and the grid work in every country: both are
+            // coordinates. Postal code works wherever a postal code can be
+            // turned into a point, which was MEASURED per country — in Israel
+            // it cannot, so it is not offered there (postalCodeIsLocatable in
+            // lib/scanner/postal-input.ts). Only RADIUS is still American — its
+            // grid is compass points in miles around a US ZIP.
+            ...(postalCodeIsLocatable(projectCountry) ? [{ value: 'zip', label: t.locationModeZip }] : []),
+            { value: 'exact_point', label: t.locationModeExactPoint },
+            { value: 'grid', label: t.locationModeGrid },
+            ...(projectCountry?.toUpperCase() === 'US' ? [{ value: 'radius', label: t.locationModeRadius }] : []),
           ]}
         />
         {projectCountry?.toUpperCase() !== 'US' && (
@@ -310,13 +322,11 @@ export default function TrackingTargetForm({
           name="postal_code"
           value={postalCode}
           onChange={(e) => {
-            const val = e.target.value.replace(/\D/g, '').slice(0, 5)
-            setPostalCode(val)
+            setPostalCode(sanitizePostalInput(e.target.value, projectCountry))
           }}
           required
-          placeholder="12345"
-          maxLength={5}
-          pattern="\d{5}"
+          placeholder={postalRules(projectCountry).placeholder}
+          maxLength={postalRules(projectCountry).maxLength}
           hint={t.zipHint}
         />
       )}
@@ -351,13 +361,13 @@ export default function TrackingTargetForm({
         </div>
       )}
 
-      {locationMode === 'exact_point' && (
+      {isCentreMode && (
         <div className="space-y-3 p-3 bg-sunk border border-line rounded-control">
           <div className="text-copy text-body font-medium">
-            {t.exactPointTitle}
+            {locationMode === 'grid' ? t.gridCentreTitle : t.exactPointTitle}
           </div>
           <Segmented
-            ariaLabel={t.exactPointTitle}
+            ariaLabel={locationMode === 'grid' ? t.gridCentreTitle : t.exactPointTitle}
             value={exactSubMode}
             onChange={(v) => {
               setExactSubMode(v)
@@ -377,12 +387,12 @@ export default function TrackingTargetForm({
               }}
               placeholder={projectCountry?.toUpperCase() === 'US' ? '1600 Amphitheatre Pkwy, Mountain View, CA 94043' : t.exactAddressPlaceholderIL}
               hint={t.exactAddressHint}
-              required
+              required={locationMode === 'exact_point'}
             />
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <Input
-                label="Latitude *"
+                label={locationMode === 'exact_point' ? `${t.latitudeLabel} *` : t.latitudeLabel}
                 name="exact_resolved_lat"
                 type="number"
                 step="0.000001"
@@ -392,10 +402,10 @@ export default function TrackingTargetForm({
                   setValidationError('')
                 }}
                 placeholder="37.4220"
-                required
+                required={locationMode === 'exact_point'}
               />
               <Input
-                label="Longitude *"
+                label={locationMode === 'exact_point' ? `${t.longitudeLabel} *` : t.longitudeLabel}
                 name="exact_resolved_lng"
                 type="number"
                 step="0.000001"
@@ -405,7 +415,7 @@ export default function TrackingTargetForm({
                   setValidationError('')
                 }}
                 placeholder="-122.0841"
-                required
+                required={locationMode === 'exact_point'}
               />
             </div>
           )}
@@ -417,12 +427,28 @@ export default function TrackingTargetForm({
           )}
 
           <div className="text-caption text-muted">
-            {t.exactCoordsNote}
+            {locationMode === 'grid' ? t.gridCentreHint : t.exactCoordsNote}
           </div>
         </div>
       )}
 
-      <input type="hidden" name="grid_size" value="" />
+      {locationMode === 'grid' ? (
+        <div className="space-y-2">
+          <Select
+            label={t.gridSizeLabel}
+            name="grid_size"
+            value={gridSize}
+            onChange={(e) => setGridSize(e.target.value as GridSize)}
+            options={(Object.keys(GRID_DIMENSIONS) as GridSize[]).map((size) => ({
+              value: size,
+              label: `${GRID_DIMENSIONS[size]} × ${GRID_DIMENSIONS[size]}`,
+            }))}
+          />
+          <div className="text-caption text-muted">{t.gridSizeHint(gridPointCount(gridSize))}</div>
+        </div>
+      ) : (
+        <input type="hidden" name="grid_size" value="" />
+      )}
       {locationMode === 'project' && (
         <input type="hidden" name="custom_city" value="" />
       )}
@@ -435,20 +461,20 @@ export default function TrackingTargetForm({
           <input type="hidden" name="radius_miles" value="" />
         </>
       )}
-      {locationMode !== 'exact_point' && (
+      {!isCentreMode && (
         <>
           <input type="hidden" name="exact_address_input" value="" />
           <input type="hidden" name="exact_resolved_lat" value="" />
           <input type="hidden" name="exact_resolved_lng" value="" />
         </>
       )}
-      {locationMode === 'exact_point' && exactSubMode === 'address' && (
+      {isCentreMode && exactSubMode === 'address' && (
         <>
           <input type="hidden" name="exact_resolved_lat" value="" />
           <input type="hidden" name="exact_resolved_lng" value="" />
         </>
       )}
-      {locationMode === 'exact_point' && exactSubMode === 'coords' && (
+      {isCentreMode && exactSubMode === 'coords' && (
         <input type="hidden" name="exact_address_input" value="" />
       )}
 

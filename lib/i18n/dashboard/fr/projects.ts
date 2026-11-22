@@ -169,6 +169,13 @@ export const projectsFr: DeepPartial<DashboardDictionary> = {
       chartLabel: (keyword: string) => `La position Google de « ${keyword} » à chaque relevé`,
       chartEmpty: 'Le graphique apparaît après deux relevés où le site a été trouvé.',
       positionAt: (position: string) => `Position ${position}`,
+      gridTitle: 'Carte de la zone',
+      gridNorth: 'Le nord est en haut',
+      gridAverage: 'Position moyenne sur tous les points :',
+      gridInTop3: 'Points dans les 3 premiers :',
+      gridNotMeasured: 'Point non mesuré',
+      gridNoneFound: (n: number) => `L'entreprise n'a été trouvée à aucun des ${n} points mesurés.`,
+      gridEmptyNote: "La dernière vérification n'a renvoyé aucun point sur la carte. Cela signifie généralement que le mot-clé n'a pas de centre : ouvrez-le pour le modifier et saisissez une adresse ou des coordonnées.",
     },
   },
   competitors: {

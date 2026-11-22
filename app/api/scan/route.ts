@@ -8,6 +8,8 @@ import {
   buildQuotaError,
   buildTrialTargetAlreadyScannedError,
   countActiveTargets,
+  countPlannedChecks,
+  providerChecksForTarget,
   countKeywordChecksTrialLifetime,
   hasTrialTargetAlreadyBeenScanned,
   areAnyTrialTargetsAlreadyScanned,
@@ -15,6 +17,9 @@ import {
 import { resolveCurrentUsagePeriod } from '@/lib/billing/usage-period'
 import { reserveUsage, finalizeUsageReservation, releaseUsageReservation } from '@/lib/billing/usage-reservations'
 import { resolveUSZipCodeToCoordinates } from '@/lib/scanner/us-zip-codes'
+import { DEFAULT_GRID_SIZE, DEFAULT_GRID_SPACING_KM, isGridSize } from '@/lib/scanner/grid-scan'
+import { recordGridPoints, finishGridSavesAfterResponse, GRID_DEADLINE_MARGIN_MS } from '@/lib/scanner/grid-points-store'
+import type { LocationMode } from '@/lib/supabase/types'
 import {
   Deadline, DeadlineExceededError, withDeadline, logOperation, newRequestId,
 } from '@/lib/ops/deadline'
@@ -234,9 +239,20 @@ export async function POST(request: Request) {
     if (isEntitlementUnknown(entitlement.plan)) {
       return Response.json(buildEntitlementUnavailableError(), { status: 503 })
     }
+    // CHECKS, NOT KEYWORDS. A grid keyword spends one check per measurement
+    // point and a radius keyword nine, so counting rows here would reserve a
+    // fraction of what the scan is about to spend (see lib/quota.ts).
     const checksThisScan = targetId
-      ? 1
-      : await countActiveTargets(projectId, admin)
+      ? await (async () => {
+          const { data: one } = await admin
+            .from('tracking_targets')
+            .select('location_mode, grid_size')
+            .eq('id', targetId)
+            .eq('project_id', projectId)
+            .maybeSingle()
+          return one ? providerChecksForTarget(one) : 0
+        })()
+      : await countPlannedChecks(projectId, admin)
 
     if (checksThisScan === 0) {
       return Response.json({ error: 'No active targets found' }, { status: 404 })
@@ -363,6 +379,7 @@ export async function POST(request: Request) {
     void loadCompetitorDomainsForScan(admin, { projectId, ownerId: project.user_id })
       .then((domains) => { competitorDomains = domains })
     const competitorSaves: Promise<unknown>[] = []
+    const gridSaves: Promise<unknown>[] = []
 
     // Load targets to scan
     let targetsQuery = admin
@@ -512,12 +529,10 @@ export async function POST(request: Request) {
           businessName: target.target_business_name || project.business_name,
         })
 
-        let locationMode: 'project' | 'custom' | 'zip' | 'exact_point' | 'radius' = target.location_mode || 'project'
-
-        // Backward compatibility: convert removed 'grid' mode to custom or project
-        if (locationMode === 'grid' as any) {
-          locationMode = target.custom_city?.trim() ? 'custom' : 'project'
-        }
+        // 'grid' is a real mode again (lib/scanner/grid-scan.ts), so the
+        // converter that turned it into 'custom' or 'project' is gone: a row
+        // that still carries the old value is now measured as a grid.
+        const locationMode: LocationMode = target.location_mode || 'project'
 
         // DEBUG: log what was actually loaded
         console.log('[Scan] === TARGET LOADED FROM DB ===')
@@ -537,9 +552,9 @@ export async function POST(request: Request) {
         console.log('[Scan] postal_code:', target.postal_code)
         console.log('[Scan] === END TARGET LOAD ===')
 
-        if (locationMode === 'zip' && project.country.toUpperCase() !== 'US') {
-          throw new Error('ZIP code mode is only supported for US projects')
-        }
+        // Postal-code mode is country-agnostic: the geocoder is asked in the
+        // project's own country (lib/scanner/google-maps.ts). Radius still is
+        // not — its grid is American miles around an American ZIP.
         if (locationMode === 'radius' && project.country.toUpperCase() !== 'US') {
           throw new Error('Radius mode is only supported for US projects')
         }
@@ -565,6 +580,22 @@ export async function POST(request: Request) {
             addressInput: target.exact_address_input || null,
             resolutionSource: target.exact_resolution_source || null,
             geocodingProvider: target.exact_geocoding_provider || null,
+          }
+        } else if (locationMode === 'grid') {
+          // A grid's centre is NOT the source of truth the way exact_point's is:
+          // lib/scanner/google-maps.ts also accepts a postal code or the project
+          // city. So a saved centre is passed when it is valid, and nothing is
+          // thrown when it is absent.
+          const lat = typeof target.exact_resolved_lat === 'number' ? target.exact_resolved_lat : null
+          const lng = typeof target.exact_resolved_lng === 'number' ? target.exact_resolved_lng : null
+          if (lat !== null && lng !== null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+            exactPointInput = {
+              lat,
+              lng,
+              addressInput: target.exact_address_input || null,
+              resolutionSource: target.exact_resolution_source || null,
+              geocodingProvider: target.exact_geocoding_provider || null,
+            }
           }
         }
 
@@ -657,6 +688,15 @@ export async function POST(request: Request) {
             : null,
           exactPoint: exactPointInput,
           radiusCenter: radiusCenterInput,
+          ...(locationMode === 'grid'
+            ? {
+                gridSize: isGridSize(target.grid_size) ? target.grid_size : DEFAULT_GRID_SIZE,
+                gridSpacingKm: DEFAULT_GRID_SPACING_KM,
+                // The batch stops itself before the platform cuts the request
+                // off, leaving the points it did measure stored.
+                gridDeadlineAtMs: Date.now() + Math.max(0, deadline.remaining() - GRID_DEADLINE_MARGIN_MS),
+              }
+            : {}),
           ...(target.engine_type === 'google_search' && competitorDomains.length > 0 ? { competitorDomains } : {}),
         }
 
@@ -707,7 +747,11 @@ export async function POST(request: Request) {
           throw new DeadlineExceededError('provider')
         }
         diag.stage = 'provider'
-        dispatchedCount++ // the provider call is about to actually happen — this check is now "consumed" regardless of outcome (including a valid not-found result)
+        // One check for an ordinary keyword; for a grid or a radius keyword, the
+        // number of provider calls it is about to make (lib/quota.ts). A grid
+        // that stops at its deadline gives the unspent points back below.
+        const plannedChecks = providerChecksForTarget(target)
+        dispatchedCount += plannedChecks // the provider call is about to actually happen — these checks are now "consumed" regardless of outcome (including a valid not-found result)
         const scanOutput = await withDeadline(
           runScan(target.engine_type, scanPayload), deadline.sliceFor(PROVIDER_STEP_MS), 'provider')
 
@@ -760,7 +804,11 @@ export async function POST(request: Request) {
           }
         }
 
-        const { error: resultError } = await admin.from('scan_results').insert(resultData)
+        const { data: insertedResult, error: resultError } = await admin
+          .from('scan_results')
+          .insert(resultData)
+          .select('id')
+          .maybeSingle()
 
         if (resultError) {
           // The SQLSTATE is actionable; `details` and `hint` quote row values
@@ -803,6 +851,22 @@ export async function POST(request: Request) {
           }))
         }
 
+        // The grid's own points, under the same checked_at as the aggregate row.
+        // Not awaited, and it never rejects.
+        if (scanOutput.gridScanMetadata) {
+          const grid = scanOutput.gridScanMetadata
+          // Points the deadline stopped us from measuring were never sent to
+          // the provider, so they are not consumed.
+          dispatchedCount -= Math.max(0, plannedChecks - grid.pointsScanned)
+          if (insertedResult?.id) {
+            gridSaves.push(recordGridPoints(admin, {
+              ownerId: project.user_id, projectId, trackingTargetId: target.id,
+              scanResultId: insertedResult.id as string,
+              checkedAt: resultData.checked_at as string, grid,
+            }))
+          }
+        }
+
         results.push({
           targetId: target.id,
           keyword: target.keyword,
@@ -833,6 +897,8 @@ export async function POST(request: Request) {
 
     // Competitor inserts still in flight finish after the response.
     finishCompetitorSavesAfterResponse(competitorSaves)
+    // And the grid points, on the same arrangement.
+    finishGridSavesAfterResponse(gridSaves)
 
     // Cumulative tally across ALL attempts of this scan row (not just this
     // attempt's targetsToRun) — correct even when this request resumed a

@@ -109,6 +109,18 @@ const OTHER_ENGINES = /perplexity|copilot|grok/i
  * the contrast itself.
  */
 const ON_DEMAND = /on\s+demand|on\s+request|per\s+request|upon\s+request|separately|manually|bajo\s+(?:demanda|petici[óo]n)|a\s+demanda|por\s+separado|manualmente|sob\s+demanda|a\s+pedido|por\s+solicita[çc][ãa]o|[àa]\s+la\s+demande|sur\s+demande|s[ée]par[ée]ment|manuellement|su\s+richiesta|a\s+richiesta|separatamente|auf\s+(?:anfrage|wunsch)|einzeln|manuell|op\s+(?:aanvraag|verzoek)|afzonderlijk|handmatig|na\s+[żz][ąa]danie|na\s+[żz]yczenie|osobno|r[ęe]cznie|לפי דרישה|על פי בקשה|בנפרד|ידנית|リクエスト|都度|個別/i
+/**
+ * THE THIRD SHAPE, measured 21 November 2026 on the English article:
+ *
+ *   "...automatically, while offering SINGLE-QUESTION CHECKS for Perplexity,
+ *    Copilot, and Grok from our menu."
+ *
+ * Nothing is denied and nothing is "on request": the line is drawn by HOW MUCH
+ * is covered — one question at a time rather than a standing automatic check.
+ * It was the shape predicted when ON_DEMAND shipped, and it cost the English
+ * locale its day.
+ */
+const PER_QUESTION = /single[-\s]question|one[-\s]off|per[-\s]question|question[-\s]by[-\s]question|one\s+question\s+at\s+a\s+time|individual\s+(?:check|checks|quer|question)|consultas?\s+individual|verifiche?\s+singol|einzelabfrage|einzelne\s+abfrage|afzonderlijke\s+vraag|pojedyncz|requ[êe]tes?\s+ponctuelle|ponctuel|בדיק(?:ה|ות)\s+בודד|שאל(?:ה|ות)\s+בודד|単発|都度/i
 const AUTOMATIC = /אוטומט|automatic|automátic|automatically|automatis|automatiqu|automatyczn|自動/i
 const RATING_WORDS = '(?:ביקורות|reviews|rese\u00f1as|avalia[\u00e7c][\u00f5o]es|avis|recensioni|bewertungen|rezensionen|beoordelingen|opinii|opinie|recenzji|\u30ec\u30d3\u30e5\u30fc|\u8a55\u4fa1|\u53e3\u30b3\u30df)'
 const RATING = new RegExp(
@@ -222,10 +234,10 @@ function claimsEngineCoverage(sentence: string): boolean {
   // engines in one breath, which would now pass. The cost of the window was
   // measured instead: two locales, two days running, published nothing at all.
   //
-  // ON_DEMAND is read the same way, and for the same reason: it is how the
-  // distinction is drawn when nothing is being denied.
+  // ON_DEMAND and PER_QUESTION are read the same way, and for the same reason:
+  // they are how the distinction is drawn when nothing is being denied.
   return !NEGATION_BEFORE.test(sentence) && !NEGATION_AFTER.test(sentence)
-    && !ON_DEMAND.test(sentence)
+    && !ON_DEMAND.test(sentence) && !PER_QUESTION.test(sentence)
 }
 
 const SAMPLE_MAX = 160

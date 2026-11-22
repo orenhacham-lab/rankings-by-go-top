@@ -354,10 +354,19 @@ async function main() {
     }
     check('E6: the cron authenticates first (fails closed), then schedules the AI check, then the rank work as before', order(route))
     check('E7: MUT scheduling before the auth check fails E6', !order(route.replace("const denied = authorizeCronRequest(request, 'Schedule')\n  if (denied) return denied", '') + "\nconst denied = authorizeCronRequest(request, 'Schedule')\n  if (denied) return denied"))
+    // E8's second clause guards the rank loop from being disturbed by the AI
+    // check that shares this route. On 21.11.2026 the loop gained ONE thing of
+    // its own: a deadline break, so the invocation stops starting projects
+    // instead of being killed inside one (lib/scan-scheduler/chain.ts). The
+    // clause was widened to permit exactly that break and nothing else --
+    // anything further between the `for` and the dispatch still fails here.
     const isolated = (src: string) => /try \{\s*after\(\(\) => startIsolatedMonthlyAiChecks\([\s\S]{0,200}\)\s*\} catch \{/.test(src)
-      && /for \(const project of projects\) \{\s*const outcome = await processScheduledScanForProject\(admin, project, \{ now \}\)/.test(src)
+      && /for \(const project of projects\) \{\s*(?:if \(Date\.now\(\) >= deadlineAtMs\) \{[\s\S]{0,400}?break\s*\}\s*)?const outcome = await processScheduledScanForProject\(admin, project, \{ now \}\)/.test(src)
     check('E8: the AI check runs in after(), inside a try, and the rank loop is unchanged', isolated(route))
     check('E9: MUT awaiting the AI check inline fails E8', !isolated(route.replace('after(() => startIsolatedMonthlyAiChecks(', 'await (() => startIsolatedMonthlyAiChecks(')))
+    check('E9b: MUT any OTHER work slipped into the rank loop still fails E8',
+      !isolated(route.replace('const outcome = await processScheduledScanForProject(admin, project, { now })',
+        'await somethingElse(project)\n    const outcome = await processScheduledScanForProject(admin, project, { now })')))
     // The route itself, with no request scope for after(): the rank answer is unchanged.
     process.env.CRON_SECRET = 'qa-cron'
     ADMIN_CLIENT = world().admin
@@ -656,7 +665,73 @@ async function main() {
     // edge-session.qa.ts holds the gate to redirecting exactly who it did.
     const EDGE_SESSION_GATE = new Set(['lib/shopify/__qa__/shopify-trial-route-access.qa.ts'])
     untouched = untouched.split('\n').filter((f) => f && !EDGE_SESSION_GATE.has(f)).join('\n')
+    // 2026-11-21: counting a multi-point check honestly. lib/quota.ts gains
+    // providerChecksForTarget / countPlannedChecks, which say how many PROVIDER
+    // requests one keyword costs: 1 as before, 9 for radius (which has made nine
+    // Serper calls per check since it shipped while reserving 1 — a measured
+    // under-count we paid for), and the square for a grid. The change is purely
+    // additive: not one existing line is removed or edited, and no plan, price,
+    // quota or limit VALUE appears in it — H3c above proves the catalog itself is
+    // untouched. H4d below holds that line by line, so the file stays protected
+    // against anything but these two additions.
+    const PROVIDER_CHECK_COUNT = new Set(['lib/quota.ts'])
+    untouched = untouched.split('\n').filter((f) => f && !PROVIDER_CHECK_COUNT.has(f)).join('\n')
+    // 2026-11-21: a Shopify article goes up with its own search-engine listing, and the
+    // articles already on Shopify get the listing they never had (the three changes that
+    // shipped as #486, #490 and #491). Seven files under lib/shopify carry it: the payload
+    // builder, the publisher, the backfill and its two entry points, and the two suites
+    // that drive them. It reads and writes article listings only; it changes no plan,
+    // price, quota, limit or entitlement VALUE, and the files are kept out of the set
+    // above only so that H4e below can hold them, line by line, to naming none.
+    const SHOPIFY_SEO_LISTING_PROD = [
+      'lib/shopify/article-payload.ts', 'lib/shopify/publish-article.ts', 'lib/shopify/seo-backfill.ts',
+      'lib/shopify/seo-backfill-api.ts', 'lib/shopify/seo-backfill-isolated.ts',
+    ]
+    const SHOPIFY_SEO_LISTING_QA = [
+      'lib/shopify/__qa__/shopify-article-seo-listing.qa.ts', 'lib/shopify/__qa__/shopify-seo-backfill.qa.ts',
+    ]
+    const SHOPIFY_SEO_LISTING = new Set([...SHOPIFY_SEO_LISTING_PROD, ...SHOPIFY_SEO_LISTING_QA])
+    untouched = untouched.split('\n').filter((f) => f && !SHOPIFY_SEO_LISTING.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
+    // H4e: the exception above is only as safe as this line check. No line ADDED to the seven
+    // files may name a plan, a price, a quota, an entitlement, a subscription, a trial or the
+    // usage ledger. The one allowance is the two lines in the publisher suite that stub the
+    // billing guard so the publisher can be driven at all; production files get none.
+    const BILLING_WORDS = /plan|price|quota|entitle|subscri|trial|billing|usage_res|maxAI|maxGoogle/i
+    const STUB_ONLY = /billing-guard\.ts|checkShopifyPublishEntitlement/
+    const addedNonComment = (files: string[]): string[] => {
+      let d = ''
+      try { d = execSync(`git diff -U0 8b468a8 -- ${files.join(' ')}`, { cwd: ROOT }).toString() } catch { return ['git unavailable'] }
+      return d.split('\n').filter((l: string) => l.startsWith('+') && !l.startsWith('+++')).map((l: string) => l.slice(1))
+        .filter((l: string) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    }
+    const billingLines = (prod: string[], qa: string[]) => [
+      ...prod.filter((l) => BILLING_WORDS.test(l)),
+      ...qa.filter((l) => BILLING_WORDS.test(l) && !STUB_ONLY.test(l)),
+    ]
+    const listingProd = addedNonComment(SHOPIFY_SEO_LISTING_PROD)
+    const listingQa = addedNonComment(SHOPIFY_SEO_LISTING_QA)
+    check('H4e: the Shopify listing files add no line naming a plan, price, quota, entitlement or billing value',
+      listingProd.length > 0 && listingQa.length > 0 && billingLines(listingProd, listingQa).length === 0,
+      billingLines(listingProd, listingQa).slice(0, 3).join(' | '))
+    check('H4e-MUT: a plan limit added to a production file, or a quota to a suite, fails H4e',
+      billingLines([...listingProd, '  const limit = plan.maxAIScansPerPeriodPerProject'], listingQa).length === 1 &&
+      billingLines(listingProd, [...listingQa, '  const quota = 20']).length === 1)
+    let quotaDiff = ''
+    try { quotaDiff = execSync('git diff -U0 8b468a8 -- lib/quota.ts', { cwd: ROOT }).toString() } catch { quotaDiff = 'git unavailable' }
+    const quotaChanged = quotaDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))
+    // Additions only, and no number that could be a plan limit: the only literals
+    // this code may carry are the 9 of a radius and the 1 of an ordinary keyword.
+    const additionsOnly = (ls: string[]) => ls.length > 0 && ls.every((l: string) => l.startsWith('+'))
+    const noPlanNumber = (ls: string[]) => ls
+      .filter((l: string) => !/^\+\s*(\/\/|\*|\/\*)/.test(l))
+      .every((l: string) => !/\b(?!9\b|1\b|0\b)\d{1,6}\b/.test(l))
+    check('H4d: lib/quota.ts changed only by ADDING the provider-check counters, with no plan number in them',
+      additionsOnly(quotaChanged) && noPlanNumber(quotaChanged),
+      quotaChanged.filter((l) => !l.startsWith('+')).join(' ;; ').slice(0, 200))
+    check('H4d-MUT: an edited line, or a plan number, fails H4d',
+      !additionsOnly([...quotaChanged, '-export const MAX = 20']) &&
+      !noPlanNumber([...quotaChanged, '+  const maxKeywords = 50']))
     let allowDiff = ''
     try { allowDiff = execSync('git diff -U0 8b468a8 -- lib/billing/usage-allowance.ts', { cwd: ROOT }).toString() } catch { allowDiff = 'git unavailable' }
     const allowChanged = allowDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))

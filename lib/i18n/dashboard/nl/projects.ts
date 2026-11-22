@@ -169,6 +169,13 @@ export const projectsNl: DeepPartial<DashboardDictionary> = {
       chartLabel: (keyword: string) => `De positie van „${keyword}" bij Google in elke meting`,
       chartEmpty: 'Het diagram verschijnt na twee metingen waarin de website gevonden is.',
       positionAt: (position: string) => `Positie ${position}`,
+      gridTitle: 'Kaart van het gebied',
+      gridNorth: 'Het noorden is boven',
+      gridAverage: 'Gemiddelde positie over alle punten:',
+      gridInTop3: 'Punten in de top 3:',
+      gridNotMeasured: 'Niet gemeten punt',
+      gridNoneFound: (n: number) => `Het bedrijf is op geen van de ${n} gemeten punten gevonden.`,
+      gridEmptyNote: 'De laatste controle leverde geen punten op de kaart op. Meestal betekent dit dat het zoekwoord geen middelpunt heeft: open het om te bewerken en voer een adres of coördinaten in.',
     },
   },
   competitors: {

@@ -14,6 +14,7 @@ import { refreshAccessToken, GscOAuthError } from './oauth'
 import { listSites, probeLatestAvailableDate, fetchQueryPageWindow, fetchPropertySummary } from './api'
 import { GSC_DETAIL_DATA_STATE, type SyncStore, type SyncClient, type GscWindowDays } from './sync'
 import type { GscMetricRow } from './summary'
+import { selectHistoryRows, historyRetentionCutoff } from './history'
 
 type Admin = ReturnType<typeof createAdminClient>
 export { listSites }
@@ -124,6 +125,8 @@ export function makeSyncClient(accessToken: string, siteUrl: string, maxRows: nu
 
 /** How many superseded run ids go into one DELETE ... WHERE sync_run_id IN (...). */
 const PRUNE_RUN_CHUNK = 50
+/** Rows per history INSERT; a project's whole archive is at most 2000. */
+const HISTORY_INSERT_CHUNK = 500
 
 /** SyncStore backed by admin-client writes to gsc_sync_runs + gsc_query_page_metrics. */
 export function makeSyncStore(admin: Admin): SyncStore {
@@ -174,6 +177,29 @@ export function makeSyncStore(admin: Admin): SyncStore {
         if (delErr) throw new GscServiceError('metrics_prune_failed', 500, 'Could not prune superseded Search Console rows.')
       }
       return ids.length
+    },
+    /**
+     * Remember the follow-worthy rows (lib/gsc/history.ts) and forget the ones past retention. Written
+     * with ignoreDuplicates on the primary key, so a re-run of the same window is a no-op and never
+     * touches a stored row; deletes are scoped by project_id because createAdminClient() bypasses RLS.
+     */
+    async archiveHistory(projectId: string, runId: string, windowDays: GscWindowDays, windowEnd: string, rows: GscMetricRow[]) {
+      const picked = selectHistoryRows(rows)
+      for (let i = 0; i < picked.length; i += HISTORY_INSERT_CHUNK) {
+        const payload = picked.slice(i, i + HISTORY_INSERT_CHUNK).map((r) => ({
+          project_id: projectId, window_end: windowEnd, window_days: windowDays, query: r.query, page: r.page,
+          clicks: Math.round(r.clicks), impressions: Math.round(r.impressions), position: r.position, sync_run_id: runId,
+        }))
+        const { error } = await admin.from('gsc_page_query_history')
+          .upsert(payload, { onConflict: 'project_id,window_end,window_days,query,page', ignoreDuplicates: true })
+        if (error) throw new GscServiceError('history_archive_failed', 500, 'Could not store the Search Console history.')
+      }
+      const cutoff = historyRetentionCutoff(windowEnd)
+      if (cutoff) {
+        const { error } = await admin.from('gsc_page_query_history').delete().eq('project_id', projectId).lt('window_end', cutoff)
+        if (error) throw new GscServiceError('history_archive_failed', 500, 'Could not trim the Search Console history.')
+      }
+      return picked.length
     },
     async insertMetricsBatch(runId: string, projectId: string, rows: GscMetricRow[]) {
       if (rows.length === 0) return

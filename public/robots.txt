@@ -92,6 +92,7 @@ User-agent: Kimi-User
 User-agent: ExaSearchBot
 User-agent: LinerBot
 User-agent: Liner-User
+User-agent: ShapBot
 User-agent: CCBot
 Allow: /
 Disallow: /admin
