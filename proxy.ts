@@ -13,9 +13,15 @@ import {
   isRestrictedPath, logRestrictedAttempt, noticeLocaleForPath,
   restrictionForRequest, sanctionsNotice,
 } from '@/lib/sanctions/guard'
+import { logRequestSample } from '@/lib/observability/request-sample'
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // One request in ten says who asked (lib/observability/request-sample.ts).
+  // First, so a refusal below is counted too; it never throws and never changes
+  // the response. Remove it once the CPU driver is known.
+  logRequestSample(request)
 
   // ── Restricted countries ────────────────────────────────────────
   // Before anything else, including the Supabase client below: a request we
