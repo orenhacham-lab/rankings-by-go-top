@@ -66,6 +66,14 @@ function main() {
       AI_CRAWLER_DATASET.filter((c) => !c.respectsRobots).length >= 3 &&
         AI_CRAWLER_DATASET.filter((c) => !c.respectsRobots).every((c) => (c.note ?? '').toLowerCase().includes('robots.txt')))
 
+    // Added 22.11.2026: `signedRequests` is a claim about what an operator's page
+    // says, so a row may carry it only if its own note names the protocol.
+    const signed = AI_CRAWLER_DATASET.filter((c) => c.signedRequests)
+    check('A11: every row marked as signing its requests says so in its own note',
+      signed.length >= 6 && signed.every((c) => (c.note ?? '').includes('Web Bot Auth')))
+    check('A11-MUT: a signed row whose note does not name the protocol would fail A11',
+      !signed.map((c) => ({ ...c, note: 'x' })).every((c) => (c.note ?? '').includes('Web Bot Auth')))
+
     // Added 11.11.2026, after two rows were read that day while the version
     // still said 2026.11.01 and both prose explanations still listed five
     // purposes. A consumer that caches on the version never refetched, and a

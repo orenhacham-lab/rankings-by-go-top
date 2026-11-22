@@ -73,6 +73,12 @@ export type DatasetCrawler = {
   respectsRobots: boolean
   /** True for a classic search crawler, which is not an AI crawler. */
   classicSearch?: boolean
+  /**
+   * Set only where the operator's own page says its requests are cryptographically
+   * signed under Web Bot Auth (RFC 9421), so a site can tell the real crawler from a
+   * spoofed user agent. Absent means the page does not say, never that it does not sign.
+   */
+  signedRequests?: 'web-bot-auth'
   /** The operator's own page documenting the token. */
   docs: string
   /** ISO date on which that page was read. */
@@ -517,6 +523,7 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   // ── Parallel ──────────────────────────────────────────────────────────────
   {
     token: 'ShapBot',
+    signedRequests: 'web-bot-auth',
     operator: 'Parallel Web Systems',
     purpose: 'search',
     crawls: true,
@@ -527,6 +534,7 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   },
   {
     token: 'Shap-User',
+    signedRequests: 'web-bot-auth',
     operator: 'Parallel Web Systems',
     purpose: 'answer',
     crawls: true,
@@ -539,6 +547,7 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   // ── Hark ──────────────────────────────────────────────────────────────────
   {
     token: 'HarkBot',
+    signedRequests: 'web-bot-auth',
     operator: 'Hark Labs',
     purpose: 'agent',
     crawls: true,
@@ -567,6 +576,7 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   // ── Exa ───────────────────────────────────────────────────────────────────
   {
     token: 'ExaSearchBot',
+    signedRequests: 'web-bot-auth',
     operator: 'Exa',
     purpose: 'search',
     crawls: true,
@@ -599,16 +609,18 @@ export const AI_CRAWLER_DATASET: readonly DatasetCrawler[] = [
   // ── Liner ─────────────────────────────────────────────────────────────────
   {
     token: 'LinerBot',
+    signedRequests: 'web-bot-auth',
     operator: 'Liner',
     purpose: 'search',
     crawls: true,
     respectsRobots: true,
     docs: LINER_DOCS,
     verified: READ_ON_NOV21,
-    note: 'Builds and refreshes Liner\u2019s search and reference index, including paper metadata, citations and DOI resolution. Liner documents that each of its two bots follows the group naming its own token and the * group otherwise, and that rules for this one do not apply to the other.',
+    note: 'Builds and refreshes Liner\u2019s search and reference index, including paper metadata, citations and DOI resolution. Liner documents that each of its two bots follows the group naming its own token and the * group otherwise, and that rules for this one do not apply to the other. Liner states that both of its bots sign their requests under Web Bot Auth.',
   },
   {
     token: 'Liner-User',
+    signedRequests: 'web-bot-auth',
     operator: 'Liner',
     purpose: 'answer',
     crawls: true,
