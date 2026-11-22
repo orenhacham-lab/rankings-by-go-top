@@ -63,7 +63,7 @@ function json() {
   }
 }
 
-const CSV_COLUMNS = ['token', 'operator', 'purpose', 'crawls', 'respects_robots', 'classic_search', 'docs', 'verified', 'note'] as const
+const CSV_COLUMNS = ['token', 'operator', 'purpose', 'crawls', 'respects_robots', 'classic_search', 'docs', 'verified', 'note', 'signed_requests'] as const
 
 /** RFC 4180: quote every field, and double any quote inside it. */
 function csvField(value: string | boolean | undefined) {
@@ -85,6 +85,7 @@ function csv() {
         csvField(c.docs),
         csvField(c.verified),
         csvField(c.note),
+        csvField(c.signedRequests),
       ].join(','),
     )
   }
