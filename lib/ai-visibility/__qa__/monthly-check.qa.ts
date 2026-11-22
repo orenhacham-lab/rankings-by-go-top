@@ -676,7 +676,47 @@ async function main() {
     // against anything but these two additions.
     const PROVIDER_CHECK_COUNT = new Set(['lib/quota.ts'])
     untouched = untouched.split('\n').filter((f) => f && !PROVIDER_CHECK_COUNT.has(f)).join('\n')
+    // 2026-11-21: a Shopify article goes up with its own search-engine listing, and the
+    // articles already on Shopify get the listing they never had (the three changes that
+    // shipped as #486, #490 and #491). Seven files under lib/shopify carry it: the payload
+    // builder, the publisher, the backfill and its two entry points, and the two suites
+    // that drive them. It reads and writes article listings only; it changes no plan,
+    // price, quota, limit or entitlement VALUE, and the files are kept out of the set
+    // above only so that H4e below can hold them, line by line, to naming none.
+    const SHOPIFY_SEO_LISTING_PROD = [
+      'lib/shopify/article-payload.ts', 'lib/shopify/publish-article.ts', 'lib/shopify/seo-backfill.ts',
+      'lib/shopify/seo-backfill-api.ts', 'lib/shopify/seo-backfill-isolated.ts',
+    ]
+    const SHOPIFY_SEO_LISTING_QA = [
+      'lib/shopify/__qa__/shopify-article-seo-listing.qa.ts', 'lib/shopify/__qa__/shopify-seo-backfill.qa.ts',
+    ]
+    const SHOPIFY_SEO_LISTING = new Set([...SHOPIFY_SEO_LISTING_PROD, ...SHOPIFY_SEO_LISTING_QA])
+    untouched = untouched.split('\n').filter((f) => f && !SHOPIFY_SEO_LISTING.has(f)).join('\n')
     check('H4: plans, prices, quotas, billing, entitlement and Shopify files are untouched', untouched === '', untouched)
+    // H4e: the exception above is only as safe as this line check. No line ADDED to the seven
+    // files may name a plan, a price, a quota, an entitlement, a subscription, a trial or the
+    // usage ledger. The one allowance is the two lines in the publisher suite that stub the
+    // billing guard so the publisher can be driven at all; production files get none.
+    const BILLING_WORDS = /plan|price|quota|entitle|subscri|trial|billing|usage_res|maxAI|maxGoogle/i
+    const STUB_ONLY = /billing-guard\.ts|checkShopifyPublishEntitlement/
+    const addedNonComment = (files: string[]): string[] => {
+      let d = ''
+      try { d = execSync(`git diff -U0 8b468a8 -- ${files.join(' ')}`, { cwd: ROOT }).toString() } catch { return ['git unavailable'] }
+      return d.split('\n').filter((l: string) => l.startsWith('+') && !l.startsWith('+++')).map((l: string) => l.slice(1))
+        .filter((l: string) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    }
+    const billingLines = (prod: string[], qa: string[]) => [
+      ...prod.filter((l) => BILLING_WORDS.test(l)),
+      ...qa.filter((l) => BILLING_WORDS.test(l) && !STUB_ONLY.test(l)),
+    ]
+    const listingProd = addedNonComment(SHOPIFY_SEO_LISTING_PROD)
+    const listingQa = addedNonComment(SHOPIFY_SEO_LISTING_QA)
+    check('H4e: the Shopify listing files add no line naming a plan, price, quota, entitlement or billing value',
+      listingProd.length > 0 && listingQa.length > 0 && billingLines(listingProd, listingQa).length === 0,
+      billingLines(listingProd, listingQa).slice(0, 3).join(' | '))
+    check('H4e-MUT: a plan limit added to a production file, or a quota to a suite, fails H4e',
+      billingLines([...listingProd, '  const limit = plan.maxAIScansPerPeriodPerProject'], listingQa).length === 1 &&
+      billingLines(listingProd, [...listingQa, '  const quota = 20']).length === 1)
     let quotaDiff = ''
     try { quotaDiff = execSync('git diff -U0 8b468a8 -- lib/quota.ts', { cwd: ROOT }).toString() } catch { quotaDiff = 'git unavailable' }
     const quotaChanged = quotaDiff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l))

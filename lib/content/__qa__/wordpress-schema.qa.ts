@@ -228,6 +228,17 @@ async function main() {
     // suite's own fake client, taught the two methods the gate calls. Its own
     // feature, and W3c below proves it carries no WordPress-schema line.
     'lib/shopify/__qa__/shopify-trial-route-access.qa.ts',
+    // A Shopify article's own search-engine listing (2026-11-21): the payload
+    // builder, the publisher, the listing backfill, its two entry points and the
+    // two suites that drive them. Its own feature, and W3c below proves it carries
+    // no WordPress-schema line.
+    'lib/shopify/article-payload.ts',
+    'lib/shopify/publish-article.ts',
+    'lib/shopify/seo-backfill.ts',
+    'lib/shopify/seo-backfill-api.ts',
+    'lib/shopify/seo-backfill-isolated.ts',
+    'lib/shopify/__qa__/shopify-article-seo-listing.qa.ts',
+    'lib/shopify/__qa__/shopify-seo-backfill.qa.ts',
   ]
   const WP_SCHEMA_LINE = /publishArticleSchema|ld\+json|wordpress/i
 
@@ -261,11 +272,17 @@ async function main() {
   check('W3: the WordPress schema feature has not reached into Shopify code', foreignWp.length === 0, foreignWp.slice(0, 4).join(' | '))
   check('MUTATION CONTROL: a WordPress-schema line added to Shopify code would be caught',
     ['publishArticleSchemaToWordPress(creds, article)'].filter((l) => !/sanctions|restrictionForRequest|logRestrictedAttempt|restricted|451/.test(l)).length === 1)
+  // A comment that names WordPress (the listing backfill's own comments compare it to the
+  // WordPress backfill) is not a WordPress-schema step; only code can reach into the path.
+  const isCommentLine = (l: string) => /^\+\s*(\/\/|\*|\/\*)/.test(l)
   const appStoreLeak = execSync(`git diff -U0 8b468a8 -- ${APP_STORE_CONNECT_FILES.join(' ')}`, { cwd: ROOT }).toString()
-    .split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++') && WP_SCHEMA_LINE.test(l))
+    .split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++') && !isCommentLine(l) && WP_SCHEMA_LINE.test(l))
   check('W3c: the files left out for the App Store connect carry no WordPress-schema line', appStoreLeak.length === 0, appStoreLeak.slice(0, 3).join(' | '))
   check('MUTATION CONTROL: a WordPress-schema line in one of those files would be caught',
-    ['+  await publishArticleSchemaToWordPress(creds, article)'].filter((l) => WP_SCHEMA_LINE.test(l)).length === 1)
+    ['+  await publishArticleSchemaToWordPress(creds, article)'].filter((l) => !isCommentLine(l) && WP_SCHEMA_LINE.test(l)).length === 1)
+  check('MUTATION CONTROL: a comment naming WordPress is not counted, but the same words as code are',
+    ['+ * the same rule the WordPress backfill states'].filter((l) => !isCommentLine(l) && WP_SCHEMA_LINE.test(l)).length === 0 &&
+    ['+  const x = wordpressSchema(article)'].filter((l) => !isCommentLine(l) && WP_SCHEMA_LINE.test(l)).length === 1)
   // The article schema rides the existing /fix schema_jsonld and adds nothing to the plugin. Since
   // the WordPress.org switch the plugin is exactly the pinned release (lib/site-fix/__qa__/approved-plugin.ts),
   // so "adds nothing" is: every plugin file is byte-for-byte that release.
