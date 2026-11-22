@@ -378,6 +378,19 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'docs.mistral.ai': 'operator documentation cited by the open crawler dataset; not fetched',
     'duckduckgo.com': 'operator documentation cited by the open crawler dataset; not fetched',
     'kagi.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    // Nine more operator pages the dataset cites (Exa, Liner, Amazon Q, Parallel, Hark and
+    // the rest), each a link in the data that a reader follows, never one the page loads.
+    // If one is ever rendered as an image, a script or a prefetch it becomes a recipient
+    // and must move to RECIPIENTS and the privacy policies.
+    'app.hark.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'crawler.exa.ai': 'operator documentation cited by the open crawler dataset; not fetched',
+    'docs.aws.amazon.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'elevenlabs.io': 'operator documentation cited by the open crawler dataset; not fetched',
+    'imagesift.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'liner-user.liner.com': 'operator documentation cited by the open crawler dataset; not fetched',
+    'parallel.ai': 'operator documentation cited by the open crawler dataset; not fetched',
+    'www.kimi.ai': 'operator documentation cited by the open crawler dataset; not fetched',
+    'www.qualified.com': 'operator documentation cited by the open crawler dataset; not fetched',
     // The licence the dataset is published under, named in the payload so a
     // consumer knows what attribution it owes. A link, not a fetch.
     'creativecommons.org': 'the CC BY 4.0 licence the open dataset names; not fetched',
