@@ -23,6 +23,11 @@ export async function proxy(request: NextRequest) {
   // the response. Remove it once the CPU driver is known.
   logRequestSample(request)
 
+  // TEMPORARY (with the sampler): the matcher below now lets /api through only
+  // so it can be counted. An API route authenticates itself (see CLAUDE.md), so
+  // the proxy must do nothing else for it: answer at once, unchanged.
+  if (pathname.startsWith('/api/')) return NextResponse.next()
+
   // ── Restricted countries ────────────────────────────────────────
   // Before anything else, including the Supabase client below: a request we
   // are not allowed to deal with should cost us nothing and should never
@@ -313,6 +318,6 @@ function logAccessDecision(request: NextRequest, userId: string, d: AccessDiagno
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
