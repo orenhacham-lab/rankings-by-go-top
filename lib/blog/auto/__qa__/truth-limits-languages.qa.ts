@@ -367,6 +367,30 @@ async function main() {
     check('MUTATION: the old sample missed the number (so G would fail)', !OLD_SAMPLE.includes('35%'))
   }
 
+  // ---------------------------------------------------------------------------
+  // H. Tracking the READER'S ad spend daily or weekly is not our cadence claim.
+  //    22 Nov 2026: the Hebrew row "בדיקת מילות מפתח" died on this sentence.
+  // ---------------------------------------------------------------------------
+  console.log('\nH. cadence about the reader\'s own ad spend')
+  {
+    const stored = 'מומלצת בדיקה חודשית מקיפה לצד סריקה יזומה בעת הצורך מעקב יומי או שבועי אחר תקציב ועלות לקליק מה עושים עם תוצאות הבדיקה?'
+    check('H: the sentence that parked the row on 22 Nov now publishes',
+      !verdict(stored).failures.includes('tracking_cadence_claim'), verdict(stored).failures.join(','))
+    check('H: "מעקב שבועי אחר עלויות" publishes',
+      !verdict('כדאי לבצע מעקב שבועי אחר עלויות הקמפיין.').failures.includes('tracking_cadence_claim'))
+    // The claim itself stays refused, however the sentence around it reads.
+    check('H: daily tracking of positions is still refused',
+      verdict('המערכת מבצעת מעקב יומי אחר מיקומים באופן אוטומטי.').failures.includes('tracking_cadence_claim'))
+    check('H: a budget sentence does not hide a cadence claim next to it',
+      verdict('מעקב יומי אחר תקציב הוא חשוב. המערכת שלנו מבצעת מעקב יומי אחר דירוג האתר.').failures.includes('tracking_cadence_claim'))
+    check('H: the English claim is untouched',
+      verdict('We offer daily tracking of your keywords.').failures.includes('tracking_cadence_claim'))
+    // MUTATION CONTROL — without the exemption the stored sentence is refused,
+    // which is the 22 Nov defect.
+    const OLD = /(מעקב|בדיקה|סריקה)\s+(יומי|יומית|שבועי|שבועית)/i
+    check('MUTATION: the old pattern refused the budget sentence (so H would fail)', OLD.test(stored))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }

@@ -477,6 +477,32 @@ async function main() {
     check('F18: a slug already on the blog is never overwritten', summary.failure === 'publish:slug_taken' && admin.tables.articles.length === 1, summary.failure)
   }
   {
+    // 22 Nov 2026: the slug is checked BEFORE the cover, and a topic already
+    // written in this language is parked instead of regenerated twice more.
+    let covers = 0
+    const countingCover: BlogAutoDeps['cover'] = async () => { covers++; return { ok: true, url: 'https://x.supabase.co/storage/v1/object/public/article-images/auto/a.jpg' } }
+    const admin = fake([planned()], [{ id: 'a0', slug: 'rank-check', locale: 'he', title: 'קיים' }])
+    await runBlogAutoPublish(admin as unknown as Admin, { now: sunday }, deps({ cover: countingCover }))
+    const row = admin.tables[PLAN_TABLE][0] as Record<string, unknown>
+    check('F18b: a slug taken in the SAME language costs no cover image', covers === 0, String(covers))
+    check('F18c: and parks the row, because a retry would say the same slug', row?.status === 'failed' && row?.last_error === 'publish:slug_taken', JSON.stringify(row))
+  }
+  {
+    // The same English words in another language are a different article.
+    const admin = fake([planned({ locale: 'he' })], [{ id: 'a0', slug: 'rank-check', locale: 'pt-BR', title: 'Existente' }])
+    const summary = await runBlogAutoPublish(admin as unknown as Admin, { now: sunday }, deps())
+    const slugs = (admin.tables.articles as { slug: string }[]).map((a) => a.slug)
+    check('F18d: a slug held by ANOTHER language is published with the language added', summary.published?.slug === 'rank-check-he' && slugs.includes('rank-check') && slugs.includes('rank-check-he'), JSON.stringify({ summary: summary.published, slugs }))
+  }
+  {
+    const admin = fake([planned({ locale: 'he' })], [
+      { id: 'a0', slug: 'rank-check', locale: 'pt-BR', title: 'x' },
+      { id: 'a1', slug: 'rank-check-he', locale: 'pt-BR', title: 'y' },
+    ])
+    const summary = await runBlogAutoPublish(admin as unknown as Admin, { now: sunday }, deps())
+    check('F18e: the next free suffix is taken when the first is gone too', summary.published?.slug === 'rank-check-he-2', JSON.stringify(summary.published))
+  }
+  {
     const admin = fake([planned({ locale: 'en' })])
     const summary = await runBlogAutoPublish(admin as unknown as Admin, { now: sunday }, deps())
     check('F19: Sunday does not publish the English queue', summary.published === null && summary.skipped === 'queue_empty', summary)

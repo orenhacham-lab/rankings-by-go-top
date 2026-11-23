@@ -317,6 +317,11 @@ export function aiCrawlerOpenApiDocument() {
               type: 'boolean',
               description: 'True for a classic search crawler, which is not an AI crawler but whose index AI answers are built from.',
             },
+            signedRequests: {
+              type: 'string',
+              enum: ['web-bot-auth'],
+              description: "Present only where the operator's own page says its requests are signed under Web Bot Auth (RFC 9421), so a site can verify the crawler by signature instead of trusting the user agent. Absent means the page does not say, not that the crawler does not sign.",
+            },
             docs: {
               type: 'string',
               format: 'uri',

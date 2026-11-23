@@ -585,6 +585,9 @@ export function AiCrawlerChecker({ locale, initialUrl = '' }: { locale: PublicLo
                   <td className="px-4 py-2 align-top text-body">
                     <span className="font-semibold text-ink">{copy.purposes[c.purpose].label}</span>
                     <span className="block text-caption text-muted">{copy.purposes[c.purpose].blurb}</span>
+                    {c.signed && (
+                      <span className="mt-1 block text-caption font-semibold text-ink">{copy.reference.signedLabel}</span>
+                    )}
                   </td>
                 </tr>
               ))}
