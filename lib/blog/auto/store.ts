@@ -246,6 +246,45 @@ export type PublishOutcome =
   | { ok: false; reason: string }
 
 /**
+ * A FREE SLUG, BEFORE THE COVER IS PAID FOR.
+ *
+ * Measured 22 November 2026: Hebrew and Spanish each lost a pass of the day to
+ * `publish:slug_taken`, at attempt 1, and went back to `planned`. The model
+ * chooses the slug, in English, and `articles.slug` is unique ACROSS locales, so:
+ *
+ *   es "webmaster tools google" -> `webmaster-tools-google-guide`, which the
+ *        Portuguese article already owns. A different language, a different
+ *        article, the same English words.
+ *   he "קידום חנות אינטרנטית" -> `ecommerce-seo-guide`, which a Hebrew article
+ *        already owns. The same topic, already written.
+ *
+ * And the check ran LAST, inside publishPlanArticle, after the article and its
+ * cover image had both been generated. Each collision threw away a Gemini
+ * article and a Gemini image, and since the row returned to `planned` with the
+ * same keyword the model would say the same slug again, twice more.
+ *
+ * So the slug is settled first. Another language holds it: this article takes
+ * the language as a suffix (`webmaster-tools-google-guide-es`). The same
+ * language holds it: the topic is already on the blog, and a third article on it
+ * would only compete with the first two, so the answer is "no".
+ */
+export type SlugResolution =
+  | { ok: true; slug: string; renamed: boolean }
+  | { ok: false; reason: 'slug_taken' }
+
+export async function resolveFreeSlug(admin: Admin, slug: string, locale: string): Promise<SlugResolution> {
+  const tag = locale.toLowerCase()
+  const candidates = [slug, `${slug}-${tag}`, `${slug}-${tag}-2`, `${slug}-${tag}-3`]
+  const { data } = await admin.from('articles').select('slug, locale').in('slug', candidates)
+  const taken = new Map<string, string | null>()
+  for (const row of (data ?? []) as { slug: string; locale: string | null }[]) taken.set(row.slug, row.locale)
+  if (!taken.has(slug)) return { ok: true, slug, renamed: false }
+  if (taken.get(slug) === locale) return { ok: false, reason: 'slug_taken' }
+  const free = candidates.find((c) => !taken.has(c))
+  return free ? { ok: true, slug: free, renamed: true } : { ok: false, reason: 'slug_taken' }
+}
+
+/**
  * Insert the article and mark its plan row published, in that order: a row
  * marked published without an article would silently drop the keyword, while an
  * article whose row is still 'generating' is recovered by the stale-lock sweep
