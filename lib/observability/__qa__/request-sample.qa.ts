@@ -94,6 +94,9 @@ async function main() {
     const callAt = proxy.indexOf('logRequestSample(request)')
     const guardAt = proxy.indexOf('isRestrictedPath(pathname)')
     check('E2 it is called before the first thing that can refuse a request', callAt > 0 && guardAt > 0 && callAt < guardAt, `call ${callAt}, guard ${guardAt}`)
+    const apiAt = proxy.indexOf("pathname.startsWith('/api/')")
+    check('E4 /api is answered at once, after the sample and before any guard', apiAt > callAt && apiAt < guardAt && /startsWith\('\/api\/'\)\) return NextResponse\.next\(\)/.test(proxy), `api ${apiAt}`)
+    check('E5 the matcher lets /api through so it can be counted, and still skips static assets', !/api\//.test(proxy.slice(proxy.indexOf('matcher'))) && /_next\/static/.test(proxy))
     const mod = strip(readFileSync('lib/observability/request-sample.ts', 'utf8'))
     check('E3 it never reads a cookie, a query string or an address', !/cookies|searchParams|\.search\b|x-forwarded|x-real-ip|ip\b/.test(mod))
   }
@@ -130,6 +133,10 @@ async function main() {
     check('F4 removing the catch lets a header error escape, which D2 catches', raised)
 
     const late = strip2(readFileSync('proxy.ts', 'utf8')).replace('logRequestSample(request)', '').replace('isRestrictedPath(pathname)', 'isRestrictedPath(pathname) /*x*/ && logRequestSample(request)')
+    const noApiExit = strip2(readFileSync('proxy.ts', 'utf8')).replace("if (pathname.startsWith('/api/')) return NextResponse.next()", '')
+    check('F6 removing the /api early exit fails E4', !/startsWith\('\/api\/'\)\) return NextResponse\.next\(\)/.test(noApiExit))
+    const oldMatcher = strip2(readFileSync('proxy.ts', 'utf8')).replace('favicon\\\\.ico|', 'favicon\\\\.ico|api/|')
+    check('F7 restoring the api/ exclusion fails E5', /api\//.test(oldMatcher.slice(oldMatcher.indexOf('matcher'))), oldMatcher.slice(oldMatcher.indexOf('matcher'), oldMatcher.indexOf('matcher')+120))
     check('F5 calling it after the guard fails E2', !(late.indexOf('logRequestSample(request)') < late.indexOf('isRestrictedPath(pathname)')))
   }
 }
