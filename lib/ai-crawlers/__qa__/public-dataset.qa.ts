@@ -21,6 +21,8 @@ import {
   AI_CRAWLER_DATASET_LICENSE,
   AI_CRAWLER_DATASET_VERSION,
 } from '../dataset'
+import { AI_CRAWLERS } from '../agents'
+import { aiCrawlerCopy } from '../copy'
 
 let pass = 0,
   fail = 0
@@ -73,6 +75,18 @@ function main() {
       signed.length >= 6 && signed.every((c) => (c.note ?? '').includes('Web Bot Auth')))
     check('A11-MUT: a signed row whose note does not name the protocol would fail A11',
       !signed.map((c) => ({ ...c, note: 'x' })).every((c) => (c.note ?? '').includes('Web Bot Auth')))
+
+    // The page's table must show exactly the rows the dataset flags, in every
+    // language, or the table says something the dataset does not.
+    const pageSigned = AI_CRAWLERS.filter((c) => c.signed).map((c) => c.token).sort().join(',')
+    const dataSigned = signed.map((c) => c.token).sort().join(',')
+    const locales = ['he', 'en', 'es', 'pt-BR', 'fr', 'it', 'ja', 'de', 'nl', 'pl', 'ko'] as const
+    check('A12: the page marks exactly the rows the dataset flags as signing',
+      pageSigned.length > 0 && pageSigned === dataSigned)
+    check('A12b: every language carries a label that names the protocol',
+      locales.every((l) => aiCrawlerCopy(l).reference.signedLabel.includes('Web Bot Auth')))
+    check('A12-MUT: a page that marked an unflagged row would fail A12',
+      pageSigned + ',Googlebot' !== dataSigned)
 
     // Added 11.11.2026, after two rows were read that day while the version
     // still said 2026.11.01 and both prose explanations still listed five

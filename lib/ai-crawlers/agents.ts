@@ -72,6 +72,8 @@ export type AiCrawler = {
    * their own group so the table does not pretend Googlebot is an AI crawler.
    */
   classicSearch?: boolean
+  /** True only where the operator's own page says it signs its requests (Web Bot Auth). */
+  signed?: boolean
 }
 
 const documented = AI_CRAWLER_DATASET.map(
@@ -82,6 +84,7 @@ const documented = AI_CRAWLER_DATASET.map(
     respectsRobots: c.respectsRobots,
     documented: true,
     ...(c.classicSearch ? { classicSearch: true } : {}),
+    ...(c.signedRequests ? { signed: true } : {}),
   }),
 )
 

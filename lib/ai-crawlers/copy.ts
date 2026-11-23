@@ -60,6 +60,7 @@ export type AiCrawlerCopy = {
     colOperator: string
     colPurpose: string
     undocumented: string
+    signedLabel: string
   }
   limits: { title: string; items: string[] }
   /**
@@ -245,6 +246,7 @@ const he: AiCrawlerCopy = {
     colOperator: 'מופעל על ידי',
     colPurpose: 'לשם מה',
     undocumented: 'אין עמוד של המפעיל שמתעד את הטוקן הזה. הוא מופיע כאן כי הוא נראה בלוגים, ומופרד מהשורות שנשענות על תיעוד של המפעיל עצמו.',
+    signedLabel: 'חותם על הבקשות שלו (Web Bot Auth)',
   },
   measurement: {
     title: 'כמה אתרים באמת חוסמים אותם',
@@ -379,6 +381,7 @@ const en: AiCrawlerCopy = {
     colOperator: 'Operated by',
     colPurpose: 'What for',
     undocumented: 'No operator page documents this token. It is listed because it appears in server logs, and kept apart from the rows that rest on an operator’s own documentation.',
+    signedLabel: 'Signs its requests (Web Bot Auth)',
   },
   measurement: {
     title: 'How many sites actually block them',
@@ -513,6 +516,7 @@ const es: AiCrawlerCopy = {
     colOperator: 'Operado por',
     colPurpose: 'Para qué',
     undocumented: 'Ninguna página del operador documenta este token. Aparece aquí porque se ve en los registros del servidor, y se mantiene separado de las filas que se apoyan en la documentación del propio operador.',
+    signedLabel: 'Firma sus solicitudes (Web Bot Auth)',
   },
   measurement: {
     title: 'Cuántos sitios los bloquean de verdad',
@@ -647,6 +651,7 @@ const ptBR: AiCrawlerCopy = {
     colOperator: 'Operado por',
     colPurpose: 'Para quê',
     undocumented: 'Nenhuma página do operador documenta esse token. Ele aparece aqui porque é visto nos logs do servidor, e fica separado das linhas que se apoiam na documentação do próprio operador.',
+    signedLabel: 'Assina as próprias requisições (Web Bot Auth)',
   },
   measurement: {
     title: 'Quantos sites realmente os bloqueiam',
@@ -781,6 +786,7 @@ const fr: AiCrawlerCopy = {
     colOperator: 'Exploité par',
     colPurpose: 'Pour quoi faire',
     undocumented: "Aucune page de l'opérateur ne documente ce jeton. Il figure ici parce qu'on le voit dans les journaux du serveur, et il reste séparé des lignes qui s'appuient sur la documentation de l'opérateur lui-même.",
+    signedLabel: 'Signe ses requêtes (Web Bot Auth)',
   },
   measurement: {
     title: 'Combien de sites les bloquent réellement',
@@ -915,6 +921,7 @@ const it: AiCrawlerCopy = {
     colOperator: 'Gestito da',
     colPurpose: 'A quale scopo',
     undocumented: 'Nessuna pagina dell’operatore documenta questo token. È elencato perché compare nei log del server, e resta separato dalle righe che si basano sulla documentazione dell’operatore stesso.',
+    signedLabel: 'Firma le proprie richieste (Web Bot Auth)',
   },
   measurement: {
     title: 'Quanti siti li bloccano davvero',
@@ -1049,6 +1056,7 @@ const ja: AiCrawlerCopy = {
     colOperator: '運営元',
     colPurpose: '何のためか',
     undocumented: 'この製品トークンを記載した運営者自身のページは見つかっていません。サーバーログで見かけるため掲載していますが、運営者の文書に基づく行とは分けてあります。',
+    signedLabel: 'リクエストに署名します（Web Bot Auth）',
   },
   measurement: {
     title: 'どれだけのサイトが実際にブロックしているか',
@@ -1183,6 +1191,7 @@ const de: AiCrawlerCopy = {
     colOperator: 'Betreiber',
     colPurpose: 'Zweck',
     undocumented: 'Keine Seite des Betreibers dokumentiert dieses Token. Es steht hier, weil es in Server-Logs auftaucht, und bleibt getrennt von den Zeilen, die auf der Dokumentation des Betreibers selbst beruhen.',
+    signedLabel: 'Signiert seine Anfragen (Web Bot Auth)',
   },
   measurement: {
     title: 'Wie viele Websites sie tatsächlich blockieren',
@@ -1317,6 +1326,7 @@ const pl: AiCrawlerCopy = {
     colOperator: 'Właściciel',
     colPurpose: 'Cel',
     undocumented: 'Żadna strona operatora nie dokumentuje tego tokenu. Jest tu wymieniony, bo pojawia się w logach serwera, i pozostaje oddzielony od wierszy opartych na dokumentacji samego operatora.',
+    signedLabel: 'Podpisuje swoje żądania (Web Bot Auth)',
   },
   measurement: {
     title: 'Ile witryn naprawdę je blokuje',
@@ -1451,6 +1461,7 @@ const nl: AiCrawlerCopy = {
     colOperator: 'Eigenaar',
     colPurpose: 'Doel',
     undocumented: 'Geen enkele pagina van de exploitant documenteert dit token. Het staat hier omdat het in serverlogs voorkomt, en blijft gescheiden van de rijen die op de eigen documentatie van de exploitant rusten.',
+    signedLabel: 'Ondertekent zijn verzoeken (Web Bot Auth)',
   },
   measurement: {
     title: 'Hoeveel websites ze echt blokkeren',
@@ -1587,6 +1598,7 @@ const ko: AiCrawlerCopy = {
     colOperator: '운영 주체',
     colPurpose: '목적',
     undocumented: '운영 주체의 어떤 문서에도 이 토큰에 대한 설명이 없습니다. 서버 로그에 나타나기 때문에 여기에 포함했으며, 운영 주체의 자체 문서에 근거한 항목과는 분리해 두었습니다.',
+    signedLabel: '요청에 서명합니다(Web Bot Auth)',
   },
   measurement: {
     title: '실제로 얼마나 많은 사이트가 차단하고 있는가',
