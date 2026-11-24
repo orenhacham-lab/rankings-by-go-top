@@ -61,13 +61,25 @@ export function classifyUserAgent(userAgent: string | null | undefined): Request
   return 'browser'
 }
 
+/**
+ * For the unnamed machines only: the product token that says who it is
+ * (e.g. "Amazonbot", "Bytespider"), at most 24 characters, so the sample can
+ * show WHICH generic bots drive the cost. Never the whole User-Agent.
+ */
+export function botToken(userAgent: string | null | undefined): string {
+  const m = /([A-Za-z0-9_.-]*(?:bot|crawl|spider|slurp|scrape|fetch|monitor)[A-Za-z0-9_.-]*)/i.exec(userAgent ?? '')
+  return m ? m[1].slice(0, 24) : '-'
+}
+
 /** The line, or null when this request is not in the sample. Pure, so it can be tested without a request. */
 export function requestSampleLine(
   input: { pathname: string; userAgent: string | null | undefined },
   random: number,
 ): string | null {
   if (!(random < 1 / REQUEST_SAMPLE_ONE_IN)) return null
-  return `[req-sample] class=${classifyUserAgent(input.userAgent)} oneIn=${REQUEST_SAMPLE_ONE_IN}`
+  const cls = classifyUserAgent(input.userAgent)
+  const who = cls === 'other-bot' ? ` bot=${botToken(input.userAgent)}` : ''
+  return `[req-sample] class=${cls}${who} oneIn=${REQUEST_SAMPLE_ONE_IN}`
 }
 
 /**
