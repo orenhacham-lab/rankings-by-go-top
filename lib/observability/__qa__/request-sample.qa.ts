@@ -12,7 +12,7 @@
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  classifyUserAgent, requestSampleLine, logRequestSample, REQUEST_SAMPLE_ONE_IN,
+  classifyUserAgent, botToken, requestSampleLine, logRequestSample, REQUEST_SAMPLE_ONE_IN,
 } from '@/lib/observability/request-sample'
 
 let passed = 0
@@ -63,6 +63,10 @@ async function main() {
   console.log('C. What reaches the log')
   {
     const line = requestSampleLine({ pathname: '/dashboard/secret-id?token=abc', userAgent: UA.chrome }, 0) ?? ''
+    const amazon = requestSampleLine({ pathname: '/', userAgent: 'Mozilla/5.0 (compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot)' }, 0) ?? ''
+    check('H1 an unnamed bot line names the bot', /class=other-bot bot=Amazonbot /.test(amazon), amazon)
+    check('H2 a browser line has no bot token', !/bot=/.test(line))
+    check('H3 the token is capped and never the whole UA', botToken('x'.repeat(80) + 'bot').length <= 24 && !/Mozilla/.test(amazon))
     check('C1 the line carries the class and the rate', /class=browser/.test(line) && /oneIn=10/.test(line), line)
     check('C2 it carries no path, no query and no agent string',
       !/secret-id|token|abc|Macintosh|Chrome|Mozilla|dashboard/.test(line), line)
@@ -118,10 +122,14 @@ async function main() {
     const everyHit = Array.from({ length: 1000 }, (_, i) => noSample.requestSampleLine({ pathname: '/', userAgent: null }, i / 1000)).filter(Boolean).length
     check('F1 dropping the sample logs every request, which B1 catches', everyHit === 1000 && everyHit > 100, String(everyHit))
 
-    const leaky = await mutant("`[req-sample] class=${classifyUserAgent(input.userAgent)} oneIn=${REQUEST_SAMPLE_ONE_IN}`",
+    const leaky = await mutant("`[req-sample] class=${cls}${who} oneIn=${REQUEST_SAMPLE_ONE_IN}`",
       "`[req-sample] path=${input.pathname} ua=${input.userAgent} class=${classifyUserAgent(input.userAgent)}`")
     const leakLine = leaky.requestSampleLine({ pathname: '/dashboard/secret-id?token=abc', userAgent: UA.chrome }, 0) ?? ''
     check('F2 a line that carried the path and agent string fails C2', /secret-id|Macintosh/.test(leakLine), leakLine)
+
+    const wholeUa = await mutant("return m ? m[1].slice(0, 24) : '-'", "return userAgent ?? '-'")
+    const wholeLine = wholeUa.requestSampleLine({ pathname: '/', userAgent: 'Mozilla/5.0 (compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot)' }, 0) ?? ''
+    check('F8 a token that was the whole UA fails H3', /Mozilla/.test(wholeLine), wholeLine)
 
     const unnamed = await mutant('for (const [name, pattern] of NAMED) if (pattern.test(ua)) return name', '')
     check('F3 dropping the named crawlers collapses GPTBot into a generic bot, which A3 catches',
