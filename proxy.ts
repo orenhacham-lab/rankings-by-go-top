@@ -14,6 +14,7 @@ import {
   restrictionForRequest, sanctionsNotice,
 } from '@/lib/sanctions/guard'
 import { logRequestSample } from '@/lib/observability/request-sample'
+import { CRAWLER_CACHE_HEADER, CRAWLER_CDN_CACHE, CRAWLER_PARAM, isCacheableCrawlerRequest } from '@/lib/crawler-cache'
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -114,6 +115,22 @@ export async function proxy(request: NextRequest) {
   // a Hebrew sign-up page whose browser tab read "Create, schedule and publish
   // SEO & GEO content". One header is cheaper than 48 layout files.
   requestHeaders.set(PATHNAME_HEADER, pathname)
+
+  // A crawler asking for a public page is answered from the CDN's own cache
+  // (lib/crawler-cache.ts says why, and why a person can never be served that
+  // copy). It carries no session, so the Supabase round trip below is skipped
+  // for it: the result of that round trip, for a request with no cookie on a
+  // public path, is "no user, nothing to redirect", which is what this returns.
+  if (isCacheableCrawlerRequest({
+    method: request.method, pathname, search: request.nextUrl.search,
+    userAgent: request.headers.get('user-agent'), header: (n) => request.headers.get(n),
+  })) {
+    const target = request.nextUrl.clone()
+    target.searchParams.set(CRAWLER_PARAM, '1')
+    const res = NextResponse.rewrite(target, { request: { headers: requestHeaders } })
+    res.headers.set(CRAWLER_CACHE_HEADER, CRAWLER_CDN_CACHE)
+    return res
+  }
 
   /**
    * A `?lang=` the request CHOSE is persisted, so it survives the login
