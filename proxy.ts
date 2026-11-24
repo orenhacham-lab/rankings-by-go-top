@@ -129,7 +129,6 @@ export async function proxy(request: NextRequest) {
     target.searchParams.set(CRAWLER_PARAM, '1')
     const res = NextResponse.rewrite(target, { request: { headers: requestHeaders } })
     res.headers.set(CRAWLER_CACHE_HEADER, CRAWLER_CDN_CACHE)
-    res.headers.set('x-crawler-copy', '1') // diagnostic: does a proxy header reach the client?
     return res
   }
 
