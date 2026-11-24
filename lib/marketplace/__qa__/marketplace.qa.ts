@@ -1438,7 +1438,7 @@ async function main() {
     }
   }
 
-  const goodQuery = signedQuery({ order_id: '78906016', product_id: '758616', buyer_email: 'b@example.com' })
+  const goodQuery = signedQuery({ order_item_id: '78906016', product_id: '758616', buyer_email: 'b@example.com' })
 
   check('TH1: a redirect signed with the thank-you key yields the order id',
     withKey(() => {
@@ -1446,17 +1446,36 @@ async function main() {
       return r.ok && r.externalOrderId === '78906016'
     }))
 
+  // THE REAL REDIRECT SHAPE, from the 24.11.2026 test order: it carries the
+  // buyer-facing code in `order_id` AND the number the webhook records in
+  // `order_item_id`. Reading the wrong one verified the signature and then
+  // found no receipt, so the button silently never appeared.
+  const realShape = signedQuery({
+    order_id: 'LXUK7F2E',
+    order_item_id: '79461645',
+    product_id: '758602',
+    buyer_email: 'b@example.com',
+  })
+  check('TH1b: with both ids present the receipt key (order_item_id) is the one read',
+    withKey(() => {
+      const r = verifiedThankyouOrderId(dsProvider, realShape)
+      return r.ok && r.externalOrderId === '79461645'
+    }))
+  check('TH1c: the handoff reads the same field the webhook stores receipts under',
+    dsProvider.thankyouHandoff?.orderIdField === 'order_item_id'
+    && /value\('order_item_id'\)/.test(code('lib/marketplace/intake.ts')))
+
   // THE SIGNATURE IS THE WHOLE SECURITY OF THIS. Their order ids are short
   // and sequential, so an unsigned id would hand a stranger who typed a
   // neighbouring number somebody else's claim token.
   check('TH2: an unsigned set is refused, however well-formed the order id',
     withKey(() => {
-      const r = verifiedThankyouOrderId(dsProvider, { order_id: '78906016' })
+      const r = verifiedThankyouOrderId(dsProvider, { order_item_id: '78906016' })
       return !r.ok && r.reason === 'no_parameters'
     }))
   check('TH3: a tampered order id is refused even with the original digest',
     withKey(() => {
-      const r = verifiedThankyouOrderId(dsProvider, { ...goodQuery, order_id: '78906017' })
+      const r = verifiedThankyouOrderId(dsProvider, { ...goodQuery, order_item_id: '78906017' })
       return !r.ok && r.reason === 'bad_signature'
     }))
   check('TH4: an added parameter is refused, because their digest covers every one',
@@ -1466,7 +1485,7 @@ async function main() {
     }))
   check('TH5: a set signed with the WEBHOOK passphrase is refused',
     withKey(() => {
-      const wrong = signedQuery({ order_id: '78906016' }, 'the-ipn-passphrase')
+      const wrong = signedQuery({ order_item_id: '78906016' }, 'the-ipn-passphrase')
       const r = verifiedThankyouOrderId(dsProvider, wrong)
       return !r.ok && r.reason === 'bad_signature'
     }))
@@ -1492,7 +1511,7 @@ async function main() {
     }))
   check('TH9: a malformed digest is a refusal, not a throw',
     withKey(() => {
-      const r = verifiedThankyouOrderId(dsProvider, { order_id: '78906016', sha_sign: 'zz' })
+      const r = verifiedThankyouOrderId(dsProvider, { order_item_id: '78906016', sha_sign: 'zz' })
       return !r.ok && r.reason === 'bad_signature'
     }))
 
@@ -1502,13 +1521,13 @@ async function main() {
   // an unreadable id is refused rather than guessed at.
   check('TH10: a verified set carrying an ENCRYPTED order id is refused, not decrypted',
     withKey(() => {
-      const enc = signedQuery({ order_id: 'ds24AAAA+BBBB_e', product_id: '758616' })
+      const enc = signedQuery({ order_item_id: 'ds24AAAA+BBBB_e', product_id: '758616' })
       const r = verifiedThankyouOrderId(dsProvider, enc)
       return !r.ok && r.reason === 'no_order_id'
     }))
   check('TH11: and the digest itself still verified, so the refusal is about the id alone',
     withKey(() => {
-      const enc = signedQuery({ order_id: 'ds24AAAABBBB', product_id: '758616' })
+      const enc = signedQuery({ order_item_id: 'ds24AAAABBBB', product_id: '758616' })
       const r = verifiedThankyouOrderId(dsProvider, enc)
       return !r.ok && r.reason === 'no_order_id'
     }))
@@ -1579,7 +1598,7 @@ async function main() {
       const a = await thankyouActivation(
         () => { built = true; return thAdmin([paidRow]) },
         dsProvider,
-        { order_id: '78906016' },
+        { order_item_id: '78906016' },
       )
       return a.kind === 'none' && !built
     }))
@@ -1594,12 +1613,18 @@ async function main() {
       // The mutation is the whole point of the module: skip verification and
       // an id a visitor typed would be enough to get somebody's claim token.
       const a = await withKey(async () =>
-        thankyouActivation(() => thAdmin([paidRow]), dsProvider, { order_id: '78906016' }))
+        thankyouActivation(() => thAdmin([paidRow]), dsProvider, { order_item_id: '78906016' }))
       return a.kind === 'none'
     })())
+  check('TH-MUT5: reading order_id instead of order_item_id would be caught',
+    withKey(() => {
+      const wrong = { ...dsProvider, thankyouHandoff: { ...dsProvider.thankyouHandoff!, orderIdField: 'order_id' } }
+      const r = verifiedThankyouOrderId(wrong, realShape)
+      return !(r.ok && r.externalOrderId === '79461645')
+    }))
   check('TH-MUT2: verifying with the IPN scheme’s secret instead would be caught',
     withKey(() => {
-      const r = verifiedThankyouOrderId(dsProvider, signedQuery({ order_id: '1' }, 'another-key'))
+      const r = verifiedThankyouOrderId(dsProvider, signedQuery({ order_item_id: '1' }, 'another-key'))
       return !r.ok
     }))
   check('TH-MUT3: accepting a status other than paid would be caught',
@@ -1613,7 +1638,7 @@ async function main() {
     }))
   check('TH-MUT4: dropping the plain-id check and accepting ciphertext would be caught',
     withKey(() => {
-      const r = verifiedThankyouOrderId(dsProvider, signedQuery({ order_id: 'ds24ZZZZ' }))
+      const r = verifiedThankyouOrderId(dsProvider, signedQuery({ order_item_id: 'ds24ZZZZ' }))
       return !r.ok && r.reason === 'no_order_id'
     }))
 

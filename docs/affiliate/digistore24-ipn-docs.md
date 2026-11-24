@@ -163,11 +163,17 @@ Two per-product settings decide whether any of this happens:
 - `add order data to thank-you page URL` — Yes/No. **No** means no parameters
   at all, and then there is nothing to verify and no one-click button.
 - `encrypt order data of thank-you page URL` — set to "No, transfer data in
-  plain language" on all four products, which is why `order_id` arrives
+  plain language" on all four products, which is why the ids arrive
   readable. With encryption on, each value arrives as ciphertext beginning
   `ds24` while the digest still verifies; `lib/marketplace/thankyou-handoff.ts`
   refuses such an id rather than decrypting, because their cipher has not been
   checked against their reference here.
+
+Which id the button looks up: **`order_item_id`**, the number the webhook
+records receipts under, and not `order_id`, the short alphanumeric code the
+buyer sees. A real redirect carries both (24.11.2026 test order: `order_id`
+LXUK7F2E, `order_item_id` 79461645). The first version read `order_id`, passed
+the signature check and found no receipt, so the button never appeared.
 
 Why it matters at all: the IPN connection fires **before** the buyer is
 forwarded to the thank-you page, so the receipt already exists when the page
