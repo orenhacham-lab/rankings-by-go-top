@@ -88,6 +88,17 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Diagnostic (stage 1 canary only): the same CDN lifetime set at the
+        // routing layer, for a named crawler, to see whether it survives
+        // where the proxy's own header did not.
+        source: '/en/articles/zz-crawler-canary',
+        has: [{ type: 'header', key: 'user-agent', value: '(?i).*(googlebot|bingbot).*' }],
+        headers: [
+          { key: 'Vercel-CDN-Cache-Control', value: 's-maxage=3600, stale-while-revalidate=86400' },
+          { key: 'x-crawler-config', value: '1' },
+        ],
+      },
+      {
         source: '/favicon.ico',
         headers: [
           {
