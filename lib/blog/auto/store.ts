@@ -265,8 +265,10 @@ export type PublishOutcome =
  *
  * So the slug is settled first. Another language holds it: this article takes
  * the language as a suffix (`webmaster-tools-google-guide-es`). The same
- * language holds it: the topic is already on the blog, and a third article on it
- * would only compete with the first two, so the answer is "no".
+ * language holds it: the same suffix applies. Until 24 Nov 2026 this parked the
+ * row, and every parked row was an hour in which the language published nothing
+ * (he and ko on 23 Nov); an article on a close topic is better than a day with
+ * none, and the runner logs the rename so a cannibalising pair can be seen.
  */
 export type SlugResolution =
   | { ok: true; slug: string; renamed: boolean }
@@ -279,7 +281,6 @@ export async function resolveFreeSlug(admin: Admin, slug: string, locale: string
   const taken = new Map<string, string | null>()
   for (const row of (data ?? []) as { slug: string; locale: string | null }[]) taken.set(row.slug, row.locale)
   if (!taken.has(slug)) return { ok: true, slug, renamed: false }
-  if (taken.get(slug) === locale) return { ok: false, reason: 'slug_taken' }
   const free = candidates.find((c) => !taken.has(c))
   return free ? { ok: true, slug: free, renamed: true } : { ok: false, reason: 'slug_taken' }
 }

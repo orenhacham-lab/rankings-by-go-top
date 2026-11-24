@@ -229,7 +229,7 @@ export function buildBlogBrief(input: BlogBriefInput): ArticleBrief {
  * brief asked for (`collectAllowedYears`), which would let the model date the
  * article.
  */
-const RETRY_RULES: Record<string, string> = {
+export const RETRY_RULES: Record<string, string> = {
   percentage_claim:
     'any percentage, success rate, growth figure or "x times" result — we have no such number and may not invent one',
   customer_count_claim:
