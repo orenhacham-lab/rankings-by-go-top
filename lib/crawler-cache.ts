@@ -58,6 +58,14 @@ export function isPublicMarketingPath(pathname: string): boolean {
   return PUBLIC_SECTIONS.includes(parts[0])
 }
 
+/**
+ * STAGE 1 OF 2. Until the CDN has been seen to key a crawler's copy apart from a
+ * person's on the REAL deployment (a preview cannot be probed with a crawler
+ * agent from here), the feature answers for ONE URL that no person ever visits.
+ * Stage 2 sets this to null in a second, one-line change once that is proven.
+ */
+export const ROLLOUT_PATHS: readonly string[] | null = ['/en/articles/zz-crawler-canary']
+
 export interface CrawlerCacheInput {
   method: string
   pathname: string
@@ -67,7 +75,11 @@ export interface CrawlerCacheInput {
   header(name: string): string | null
 }
 
-export function isCacheableCrawlerRequest(input: CrawlerCacheInput): boolean {
+export function isCacheableCrawlerRequest(
+  input: CrawlerCacheInput,
+  rolloutPaths: readonly string[] | null = ROLLOUT_PATHS,
+): boolean {
+  if (rolloutPaths && !rolloutPaths.includes(input.pathname)) return false
   if (input.method !== 'GET') return false
   if (input.search) return false
   if (input.header('cookie')) return false

@@ -10,7 +10,7 @@
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  CRAWLER_CACHE_HEADER, CRAWLER_CDN_CACHE, CRAWLER_PARAM, isCacheableCrawlerRequest, isPublicMarketingPath,
+  CRAWLER_CACHE_HEADER, CRAWLER_CDN_CACHE, CRAWLER_PARAM, ROLLOUT_PATHS, isCacheableCrawlerRequest as isCacheableIn, isPublicMarketingPath,
   type CrawlerCacheInput,
 } from '@/lib/crawler-cache'
 
@@ -31,6 +31,9 @@ const UA = {
   python: 'python-requests/2.31',
   chrome: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
 }
+
+/** The full policy (no rollout limit); the shipped default is tested in group E. */
+const isCacheableCrawlerRequest = (i: CrawlerCacheInput) => isCacheableIn(i, null)
 
 function req(over: Partial<{ method: string; pathname: string; search: string; ua: string | null; headers: Record<string, string> }> = {}): CrawlerCacheInput {
   const h = over.headers ?? {}
@@ -73,6 +76,11 @@ async function main() {
   check('C6 no crawler is refused: the module has no status code, redirect or block', !/status|redirect|403|429|451|blocked?/i.test(strip(readFileSync('lib/crawler-cache.ts', 'utf8')).replace(/never blocks?/gi, '')))
   check('C7 the constants are what the docs say', CRAWLER_PARAM === '__crawler' && CRAWLER_CACHE_HEADER === 'Vercel-CDN-Cache-Control' && /s-maxage=3600/.test(CRAWLER_CDN_CACHE))
 
+  console.log('E. Stage 1: only the canary URL')
+  check('E1 the shipped default is the one canary path', ROLLOUT_PATHS !== null && ROLLOUT_PATHS.length === 1 && ROLLOUT_PATHS[0] === '/en/articles/zz-crawler-canary')
+  check('E2 a crawler on the canary is eligible', isCacheableIn(req({ pathname: '/en/articles/zz-crawler-canary' })))
+  check('E3 a crawler on a real public page is NOT yet eligible', !isCacheableIn(req({ pathname: '/en/pricing' })) && !isCacheableIn(req({ pathname: '/' })))
+
   console.log('D. Mutation controls (the real source, broken on purpose, must fail the guard)')
   {
     const SRC = join(__dirname, '..', 'crawler-cache.ts')
@@ -86,15 +94,17 @@ async function main() {
       try { return (await import(to)) as typeof import('@/lib/crawler-cache') } finally { unlinkSync(to) }
     }
     const noCookie = await mutant("if (input.header('cookie')) return false", '')
-    check('D1 dropping the cookie rule would cache a request that carries a session, which A8 catches', noCookie.isCacheableCrawlerRequest(req({ headers: { cookie: 'sb=1' } })))
+    check('D1 dropping the cookie rule would cache a request that carries a session, which A8 catches', noCookie.isCacheableCrawlerRequest(req({ headers: { cookie: 'sb=1' } }), null))
     const noQuery = await mutant('if (input.search) return false', '')
-    check('D2 dropping the query rule is caught by A9', noQuery.isCacheableCrawlerRequest(req({ search: '?lang=en' })))
+    check('D2 dropping the query rule is caught by A9', noQuery.isCacheableCrawlerRequest(req({ search: '?lang=en' }), null))
     const anyPath = await mutant('if (!isPublicMarketingPath(input.pathname)) return false', '')
-    check('D3 dropping the path allowlist would cache /dashboard, which B2 catches', anyPath.isCacheableCrawlerRequest(req({ pathname: '/en/dashboard' })))
+    check('D3 dropping the path allowlist would cache /dashboard, which B2 catches', anyPath.isCacheableCrawlerRequest(req({ pathname: '/en/dashboard' }), null))
     const everyone = await mutant("return cls === 'other-bot' && SELF_DECLARED_CRAWLER.test(input.userAgent ?? '')", 'return true')
-    check('D4 treating every agent as a crawler would cache a person, which A5 catches', everyone.isCacheableCrawlerRequest(req({ ua: UA.chrome })))
+    check('D4 treating every agent as a crawler would cache a person, which A5 catches', everyone.isCacheableCrawlerRequest(req({ ua: UA.chrome }), null))
     const loose = await mutant("PUBLIC_SECTIONS.includes(parts[0])", 'true')
     check('D5 an open allowlist is caught by B2', loose.isPublicMarketingPath('/billing'))
+    const noRollout = await mutant('if (rolloutPaths && !rolloutPaths.includes(input.pathname)) return false', '')
+    check('D8 dropping the rollout limit would cache a real page, which E3 catches', noRollout.isCacheableCrawlerRequest(req({ pathname: '/en/pricing' })))
     const noRewrite = strip(readFileSync('proxy.ts', 'utf8')).replace("target.searchParams.set(CRAWLER_PARAM, '1')", '')
     check('D6 removing the rewrite (so a crawler shares a person\'s cache key) fails C3', !/searchParams\.set\(CRAWLER_PARAM, '1'\)[\s\S]{0,200}NextResponse\.rewrite\(target/.test(noRewrite))
     const late = strip(readFileSync('proxy.ts', 'utf8')).replace('isCacheableCrawlerRequest({', 'isCacheableCrawlerRequest2({')
