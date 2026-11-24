@@ -56,11 +56,21 @@
  * allowed to use them — which is why this is the fix rather than exempting the
  * blog from the gate, with Vercel Pro due to be dropped at the end of the month.
  *
- * 04:00-15:59 UTC = 07:00-18:59 Israel. The number to watch is still the
+ * THIRTEEN, from 24 November 2026. Twelve passes for eleven languages left one
+ * spare, and 24 Nov spent it and more: Polish (12:16) and Hebrew (13:16) were
+ * each refused once by the truth gate, other languages took the later passes,
+ * and the window closed at 15:59 with both unwritten (9 of 11). The truth gate
+ * now repairs a refused sentence (lib/blog/auto/sentence-repair.ts), which
+ * makes a lost pass rarer; the extra hour is for the one that still happens.
+ * It costs no CPU on a normal day: once every language has published, a pass
+ * in the window is a read and `all_done`, and the pass gate already lets one
+ * call an hour through whether or not the window is open.
+ *
+ * 04:00-16:59 UTC = 07:00-19:59 Israel. The number to watch is still the
  * reserve, now one hour rather than seventeen runs; if a language loses a day
  * again, the next move is to stop a refused language consuming its whole hour.
  */
-export const WINDOW_HOURS_UTC: readonly number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+export const WINDOW_HOURS_UTC: readonly number[] = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
 /** Midnight UTC of the day `nowMs` falls in. */
 export function startOfUtcDay(nowMs: number): string {

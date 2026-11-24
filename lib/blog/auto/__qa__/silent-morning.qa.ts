@@ -62,32 +62,32 @@ const at = (hhmm: string) => Date.parse(`2026-11-06T${hhmm}:00Z`)
 async function main() {
   console.log('A) the day has exactly one silence check')
   {
-    // 16:00 UTC since 21 Nov 2026: the window was widened to twelve hours once
+    // 17:00 UTC since 24 Nov 2026 (16:00 from 21 Nov): the window was widened to twelve hours once
     // the pass gate of PR 472 turned each hour from four chances into one
-    // (lib/blog/auto/window-hours.ts), so the window closes at 15:59 and the
+    // (lib/blog/auto/window-hours.ts), so the window closes at 16:59 (15:59 until 24 Nov) and the
     // check moved with it. The literal is kept beside the derivation on purpose
     // — the two together are what catches a widened window that forgot this file,
     // which is exactly what this assertion did on 21 November.
     check('A1: the check is the hour after the window closes',
-      SILENCE_CHECK_HOUR_UTC === Math.max(...WINDOW_HOURS_UTC) + 1 && SILENCE_CHECK_HOUR_UTC === 16)
+      SILENCE_CHECK_HOUR_UTC === Math.max(...WINDOW_HOURS_UTC) + 1 && SILENCE_CHECK_HOUR_UTC === 17)
     check('A2: and that hour is outside the window, so it never costs a publishing pass',
-      !isInWindow(at('16:00')))
-    check('A3: the first cron slot of that hour checks', silentMorningVerdict(at('16:00')).check)
+      !isInWindow(at('17:00')))
+    check('A3: the first cron slot of that hour checks', silentMorningVerdict(at('17:00')).check)
     // MEASURED, 21 Nov 2026: the gated pass lands wherever the scheduler's drift
     // puts it — :15, :16, :17, :18 that day — so a cutoff at 15 meant the day's
     // check never ran. Every one of those minutes must check.
     for (const m of ['15', '16', '17', '18', '29']) {
       check(`A4 :${m} — a pass that drifted past the quarter still checks`,
-        silentMorningVerdict(at(`16:${m}`)).check)
+        silentMorningVerdict(at(`17:${m}`)).check)
     }
     check('A5: the second half of the hour does not, so one email a day at most',
-      !silentMorningVerdict(at('16:30')).check
-      && !silentMorningVerdict(at('16:45')).check)
+      !silentMorningVerdict(at('17:30')).check
+      && !silentMorningVerdict(at('17:45')).check)
     for (const h of WINDOW_HOURS_UTC) {
       check(`A6 ${h}:00 inside the window does not check`,
         !silentMorningVerdict(at(`0${h}:00`.slice(-5))).check)
     }
-    check('A7: nor does the rest of the day', !silentMorningVerdict(at('17:00')).check
+    check('A7: nor does the rest of the day', !silentMorningVerdict(at('18:00')).check
       && !silentMorningVerdict(at('23:05')).check && !silentMorningVerdict(at('00:05')).check)
     check('A8: the bound is half an hour, which the fifty-minute pass gate makes single',
       SILENCE_CHECK_BEFORE_MINUTE === 30 && SILENCE_CHECK_BEFORE_MINUTE < 50)
@@ -96,7 +96,7 @@ async function main() {
     // of the hour; the bound is what keeps it to one.
     const everySlot = (ms: number) => new Date(ms).getUTCHours() === SILENCE_CHECK_HOUR_UTC
     check('MUTATION: without the minute bound the later slots fire too (so A5 would fail)',
-      everySlot(at('16:00')) && everySlot(at('16:30')) && everySlot(at('16:45')))
+      everySlot(at('17:00')) && everySlot(at('17:30')) && everySlot(at('17:45')))
   }
 
   console.log('B) what it does with the morning it finds')
@@ -104,20 +104,20 @@ async function main() {
     const quiet = recorder()
     const published = await reportSilentMorning(
       fake(localesForDay().map((l) => article(l, '2026-11-06T04:10:00Z'))) as unknown as Admin,
-      { now: at('16:02'), deps: { env: ENV, send: quiet.send } })
+      { now: at('17:02'), deps: { env: ENV, send: quiet.send } })
     check('B1: a morning that published says nothing',
       published.state === 'published' && quiet.sent.length === 0, published)
 
     const partial = recorder()
     const one = await reportSilentMorning(
       fake([article('he', '2026-11-06T04:10:00Z')]) as unknown as Admin,
-      { now: at('16:02'), deps: { env: ENV, send: partial.send } })
+      { now: at('17:02'), deps: { env: ENV, send: partial.send } })
     check('B2: one language published is not a silent morning — this alert is for zero only',
       one.state === 'published' && partial.sent.length === 0, one)
 
     const silent = recorder()
     const none = await reportSilentMorning(fake([]) as unknown as Admin,
-      { now: at('16:02'), deps: { env: ENV, send: silent.send } })
+      { now: at('17:02'), deps: { env: ENV, send: silent.send } })
     check('B3: a morning with nothing published sends exactly one email',
       none.state === 'alerted' && silent.sent.length === 1, none)
     check('B4: to the operator, and nobody else',
@@ -128,21 +128,21 @@ async function main() {
       silent.sent[0]?.html.includes(String(localesForDay().length))
       && silent.sent[0]?.html.includes('אף שפה לא פרסמה'), silent.sent[0]?.html?.slice(0, 200))
     check('B7: and it is in the language its one reader reads',
-      /[֐-׿]/.test(silentMorningEmail(at('16:02'), 10).subject))
+      /[֐-׿]/.test(silentMorningEmail(at('17:02'), 10).subject))
 
     const yesterdayOnly = recorder()
     const stale = await reportSilentMorning(
       fake(localesForDay().map((l) => article(l, '2026-11-05T04:10:00Z'))) as unknown as Admin,
-      { now: at('16:02'), deps: { env: ENV, send: yesterdayOnly.send } })
+      { now: at('17:02'), deps: { env: ENV, send: yesterdayOnly.send } })
     check('B8: yesterday\'s articles do not make today look healthy',
       stale.state === 'alerted' && yesterdayOnly.sent.length === 1, stale)
 
     const skipped = recorder()
-    // 17:02, an hour PAST the check hour. It has moved twice with the window:
+    // 18:02, an hour PAST the check hour. It has moved twice with the window:
     // 11:02 when the window closed at 09:59, 12:02 when Korean bought the
-    // seventh hour, and now 17:02 after the twelve-hour window of 21 Nov 2026.
+    // seventh hour, 17:02 after the twelve-hour window of 21 Nov 2026, and now 18:02.
     const outOfSlot = await reportSilentMorning(fake([]) as unknown as Admin,
-      { now: at('17:02'), deps: { env: ENV, send: skipped.send } })
+      { now: at('18:02'), deps: { env: ENV, send: skipped.send } })
     check('B9: outside its slot it does not even read the blog',
       outOfSlot.state === 'not_checked' && skipped.sent.length === 0, outOfSlot)
 
@@ -156,13 +156,13 @@ async function main() {
   {
     const killed = recorder()
     const off = await reportSilentMorning(fake([]) as unknown as Admin,
-      { now: at('16:02'), deps: { env: { ...ENV, OPERATOR_ALERTS_DISABLED: 'true' }, send: killed.send } })
+      { now: at('17:02'), deps: { env: { ...ENV, OPERATOR_ALERTS_DISABLED: 'true' }, send: killed.send } })
     check('C1: the operator kill switch silences it like every other alert',
       off.state === 'alerted' && off.sent === false && killed.sent.length === 0, off)
 
     const unconfigured = recorder()
     const noKey = await reportSilentMorning(fake([]) as unknown as Admin,
-      { now: at('16:02'), deps: { env: { ADMIN_NOTIFICATION_EMAIL: 'ops@example.com' }, send: unconfigured.send } })
+      { now: at('17:02'), deps: { env: { ADMIN_NOTIFICATION_EMAIL: 'ops@example.com' }, send: unconfigured.send } })
     check('C2: with no Resend key it reports instead of throwing',
       noKey.state === 'alerted' && noKey.sent === false && unconfigured.sent.length === 0, noKey)
 
@@ -184,7 +184,7 @@ async function main() {
     const far = () => Date.now() + 600_000
 
     const checked = await runBlogDailyWindow(fake([]) as unknown as Admin,
-      { env, now: at('16:02'), deadlineAt: far() })
+      { env, now: at('17:02'), deadlineAt: far() })
     check('D1: the window reports the silence check it ran',
       checked.state === 'silence_checked', checked)
 
@@ -194,13 +194,13 @@ async function main() {
       ordinary.state === 'outside_window', ordinary)
 
     const preview = await runBlogDailyWindow(fake([]) as unknown as Admin,
-      { env: { VERCEL_ENV: 'preview' } as unknown as NodeJS.ProcessEnv, now: at('16:02'), deadlineAt: far() })
+      { env: { VERCEL_ENV: 'preview' } as unknown as NodeJS.ProcessEnv, now: at('17:02'), deadlineAt: far() })
     check('D3: preview never mails the operator about the company blog',
       preview.state === 'not_production', preview)
 
     process.env.BLOG_AUTO_PUBLISH_ENABLED = 'no'
     const disabled = await runBlogDailyWindow(fake([]) as unknown as Admin,
-      { env, now: at('16:02'), deadlineAt: far() })
+      { env, now: at('17:02'), deadlineAt: far() })
     check('D4: and the blog kill switch comes before the check',
       disabled.state === 'disabled', disabled)
     process.env.BLOG_AUTO_PUBLISH_ENABLED = 'true'
@@ -211,7 +211,7 @@ async function main() {
 
     // MUTATION CONTROL — the pre-fix window returned at once.
     check('MUTATION: a window that returns before the check leaves 16:02 as outside_window (so D1 would fail)',
-      !isInWindow(at('16:02')))
+      !isInWindow(at('17:02')))
   }
 
   console.log(`\n${pass} passed, ${fail} failed`)
