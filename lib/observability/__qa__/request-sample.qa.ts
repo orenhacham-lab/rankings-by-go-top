@@ -65,6 +65,8 @@ async function main() {
     const line = requestSampleLine({ pathname: '/dashboard/secret-id?token=abc', userAgent: UA.chrome }, 0) ?? ''
     const amazon = requestSampleLine({ pathname: '/', userAgent: 'Mozilla/5.0 (compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot)' }, 0) ?? ''
     check('H1 an unnamed bot line names the bot', /class=other-bot bot=Amazonbot /.test(amazon), amazon)
+    const headless = requestSampleLine({ pathname: '/', userAgent: 'Mozilla/5.0 (X11; Linux x86_64) HeadlessChrome/120.0 Safari/537.36' }, 0) ?? ''
+    check('H4 a generic machine says which word gave it away', /bot=headless /.test(headless), headless)
     check('H2 a browser line has no bot token', !/bot=/.test(line))
     check('H3 the token is capped and never the whole UA', botToken('x'.repeat(80) + 'bot').length <= 24 && !/Mozilla/.test(amazon))
     check('C1 the line carries the class and the rate', /class=browser/.test(line) && /oneIn=10/.test(line), line)
@@ -127,7 +129,7 @@ async function main() {
     const leakLine = leaky.requestSampleLine({ pathname: '/dashboard/secret-id?token=abc', userAgent: UA.chrome }, 0) ?? ''
     check('F2 a line that carried the path and agent string fails C2', /secret-id|Macintosh/.test(leakLine), leakLine)
 
-    const wholeUa = await mutant("return m ? m[1].slice(0, 24) : '-'", "return userAgent ?? '-'")
+    const wholeUa = await mutant("if (m) return m[1].slice(0, 24)", "if (m) return userAgent ?? '-'")
     const wholeLine = wholeUa.requestSampleLine({ pathname: '/', userAgent: 'Mozilla/5.0 (compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot)' }, 0) ?? ''
     check('F8 a token that was the whole UA fails H3', /Mozilla/.test(wholeLine), wholeLine)
 
