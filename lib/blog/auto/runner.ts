@@ -25,7 +25,11 @@ import type { createAdminClient } from '@/lib/supabase/admin'
 import { generateValidatedArticle } from '@/lib/content/gemini-article'
 import { placeholderContext, runQualityGate } from '@/lib/content/automation/quality-gate'
 import { BLOG_AUTO_LOCALES, localesForDay, type BlogAutoLocale } from '@/lib/blog/auto/rotation'
-import { buildBlogBrief } from '@/lib/blog/auto/brief'
+import { buildBlogBrief, RETRY_RULES } from '@/lib/blog/auto/brief'
+import {
+  MAX_REPAIR_ROUNDS, REWRITE_MIN_REMAINING_MS, repairRefusedSentences, type RewriteBlock,
+} from '@/lib/blog/auto/sentence-repair'
+import { geminiRewriteBlock } from '@/lib/blog/auto/sentence-rewrite'
 import { checkTruthLimits, encodeGateReason } from '@/lib/blog/auto/truth-limits'
 import { researchKeywords, selectKeywords } from '@/lib/blog/auto/keyword-plan'
 import { createBlogCover } from '@/lib/blog/auto/cover'
@@ -48,11 +52,14 @@ type Admin = ReturnType<typeof createAdminClient>
 export interface BlogAutoDeps {
   generate: (brief: ArticleBrief) => Promise<ValidatedArticle | ValidatedArticleError>
   cover: typeof createBlogCover
+  /** Rewrites a block the truth gate refused a sentence in. Absent: sentences are only cut. */
+  rewrite?: RewriteBlock
 }
 
 export const REAL_BLOG_AUTO_DEPS: BlogAutoDeps = {
   generate: generateValidatedArticle,
   cover: createBlogCover,
+  rewrite: geminiRewriteBlock,
 }
 
 /**
@@ -113,7 +120,7 @@ async function topUp(admin: Admin, locale: BlogAutoLocale, summary: BlogAutoSumm
 
 export async function runBlogAutoPublish(
   admin: Admin,
-  opts: { now?: number; dryRun?: boolean; locale?: BlogAutoLocale } = {},
+  opts: { now?: number; dryRun?: boolean; locale?: BlogAutoLocale; deadlineAt?: number } = {},
   deps: BlogAutoDeps = REAL_BLOG_AUTO_DEPS,
 ): Promise<BlogAutoSummary> {
   const started = Date.now()
@@ -184,11 +191,29 @@ export async function runBlogAutoPublish(
     return fail(`quality:${gate.failures.join(',')}`)
   }
 
-  const truth = checkTruthLimits({
+  // THE TRUTH GATE REPAIRS BEFORE IT REFUSES (lib/blog/auto/sentence-repair.ts).
+  // A word pattern refuses a true sentence in a new shape every week, and a
+  // refused article costs the language its whole day. So the one sentence is
+  // rewritten (or cut) and the SAME gates run again on what would be published.
+  let html = generated.safeHtml
+  const truthOf = (h: string) => checkTruthLimits({
     title: generated.article.title,
     metaDescription: generated.article.metaDescription,
-    html: generated.safeHtml,
+    html: h,
   })
+  let truth = truthOf(html)
+  const repairs: { code: string; how: string; sentence: string }[] = []
+  for (let round = 0; !truth.ok && round < MAX_REPAIR_ROUNDS; round++) {
+    const roomToRewrite = opts.deadlineAt === undefined || opts.deadlineAt - Date.now() >= REWRITE_MIN_REMAINING_MS
+    const fixed = await repairRefusedSentences({
+      html, locale, failures: truth.failures, offenders: truth.offenders, rules: RETRY_RULES,
+      round, rewrite: roomToRewrite ? deps.rewrite ?? null : null,
+    })
+    if (!fixed.ok) break
+    html = fixed.html
+    repairs.push(...fixed.actions)
+    truth = truthOf(html)
+  }
   if (!truth.ok) {
     // The sentence travels with the codes, so the next attempt is told what it
     // wrote and not only which rule it broke (17 Nov 2026: Italian spent all
@@ -198,12 +223,18 @@ export async function runBlogAutoPublish(
     })
     return fail(encodeGateReason(`truth:${truth.failures.join(',')}`, truth.samples))
   }
+  if (repairs.length > 0) {
+    console.warn('[blog-auto] truth gate repaired the article', { locale, planId: row.id, repairs })
+    // What was cut must not have taken the article under the structural floor.
+    const again = runQualityGate({ title: generated.article.title, content_html: html, slug: generated.slug })
+    if (!again.ok) return fail(`quality:${again.failures.join(',')}`)
+  }
 
   // The body's links: a bare URL becomes clickable, the product's first mention
   // becomes a link into the trial, and our other articles of this language are
   // offered at the end. The gate then refuses an article that never named the
   // system or carries no way into it.
-  const linked = withBodyLinks(generated.safeHtml, { locale, internalTargets })
+  const linked = withBodyLinks(html, { locale, internalTargets })
   const links = checkBodyLinks(linked)
   if (!links.ok) return fail(`links:${links.failures.join(',')}`)
 
@@ -211,6 +242,7 @@ export async function runBlogAutoPublish(
   const free = await resolveFreeSlug(admin, generated.slug, locale)
   if (!free.ok) return fail(`publish:${free.reason}`, true)
   const slug = free.slug
+  if (free.renamed) console.warn('[blog-auto] slug taken, published with a suffix', { locale, planId: row.id, from: generated.slug, to: slug })
 
   const cover: CoverResult = await deps.cover(admin, {
     slug,

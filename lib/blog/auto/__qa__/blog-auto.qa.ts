@@ -427,9 +427,10 @@ async function main() {
   {
     const admin = fake([planned()])
     const summary = await runBlogAutoPublish(admin as unknown as Admin, { now: sunday }, deps({
-      generate: async () => ({ ...okArticle(), safeHtml: `<h2>כ</h2><p>${WORDS} עלייה של 40% בתנועה.</p>` }),
+      // In the TITLE, which no repair may touch; a claim in the body is repaired (sentence-repair.qa.ts).
+      generate: async () => { const a = okArticle(); return { ...a, article: { ...a.article, title: 'עלייה של 40% בתנועה' } } },
     }))
-    check('F9: a percentage claim stops the publish', summary.published === null && summary.failure?.startsWith('truth:') === true, summary.failure)
+    check('F9: a percentage claim the repair cannot reach stops the publish', summary.published === null && summary.failure?.startsWith('truth:') === true, summary.failure)
     check('F10: nothing reached the blog', admin.tables.articles.length === 0)
     const row = admin.tables[PLAN_TABLE][0] as Record<string, unknown>
     check('F11: the keyword goes back in the queue with the reason', row?.status === 'planned' && String(row?.last_error).includes('percentage_claim'), row?.last_error)
@@ -474,18 +475,21 @@ async function main() {
   {
     const admin = fake([planned()], [{ id: 'a0', slug: 'rank-check', locale: 'he', title: 'קיים' }])
     const summary = await runBlogAutoPublish(admin as unknown as Admin, { now: sunday }, deps())
-    check('F18: a slug already on the blog is never overwritten', summary.failure === 'publish:slug_taken' && admin.tables.articles.length === 1, summary.failure)
+    const slugs = (admin.tables.articles as { slug: string; title: string }[])
+    check('F18: a slug already on the blog is never overwritten', slugs.find((a) => a.slug === 'rank-check')?.title === 'קיים', JSON.stringify(slugs))
+    // 24 Nov 2026: the SAME language holding the slug used to park the row, and
+    // a parked row is an hour in which the language publishes nothing.
+    check('F18b: a slug taken in the SAME language is published with the language added, not parked', summary.published?.slug === 'rank-check-he' && !summary.failure, JSON.stringify({ p: summary.published, f: summary.failure }))
   }
   {
-    // 22 Nov 2026: the slug is checked BEFORE the cover, and a topic already
-    // written in this language is parked instead of regenerated twice more.
+    // All four candidates held: nothing is paid for, and the row parks, because a retry would say the same slug.
     let covers = 0
     const countingCover: BlogAutoDeps['cover'] = async () => { covers++; return { ok: true, url: 'https://x.supabase.co/storage/v1/object/public/article-images/auto/a.jpg' } }
-    const admin = fake([planned()], [{ id: 'a0', slug: 'rank-check', locale: 'he', title: 'קיים' }])
+    const admin = fake([planned()], ['rank-check', 'rank-check-he', 'rank-check-he-2', 'rank-check-he-3'].map((slug, i) => ({ id: `a${i}`, slug, locale: 'he', title: 'קיים' })))
     await runBlogAutoPublish(admin as unknown as Admin, { now: sunday }, deps({ cover: countingCover }))
     const row = admin.tables[PLAN_TABLE][0] as Record<string, unknown>
-    check('F18b: a slug taken in the SAME language costs no cover image', covers === 0, String(covers))
-    check('F18c: and parks the row, because a retry would say the same slug', row?.status === 'failed' && row?.last_error === 'publish:slug_taken', JSON.stringify(row))
+    check('F18c: with every candidate slug taken no cover image is paid for', covers === 0, String(covers))
+    check('F18c2: and the row is parked', row?.status === 'failed' && row?.last_error === 'publish:slug_taken', JSON.stringify(row))
   }
   {
     // The same English words in another language are a different article.
@@ -643,7 +647,7 @@ async function main() {
     && /runBlogDailyWindow\(createAdminClient\(\), \{ env: process\.env, deadlineAt \}\)/.test(automationRouteSrc)
     && /await blogWindow/.test(automationRouteSrc))
   check('G5d: the morning run writes one language per invocation',
-    /runBlogAutoPublish\(admin, \{ locale \}\)/.test(windowSrc) && !/runBlogAutoPublishAllLocales/.test(windowSrc))
+    /runBlogAutoPublish\(admin, \{ locale, deadlineAt: options\.deadlineAt \}\)/.test(windowSrc) && !/runBlogAutoPublishAllLocales/.test(windowSrc))
   check('G5e: it is off unless the switch is on, Production only, and inside its window',
     /isBlogAutoPublishEnabled\(\)/.test(windowSrc)
     && /VERCEL_ENV !== 'production'/.test(windowSrc)

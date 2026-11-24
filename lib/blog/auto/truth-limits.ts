@@ -67,6 +67,13 @@ export interface TruthLimitResult {
    * what lets a retry fix the actual sentence instead of re-rolling blind.
    */
   samples: Record<string, string>
+  /**
+   * The WHOLE sentence behind each sample, exactly as it stands in the page's
+   * plain text, so the repair (lib/blog/auto/sentence-repair.ts) can find it in
+   * the body. Absent for a refusal that has no sentence (a bad link) and for one
+   * whose sentence is in the title or the meta description.
+   */
+  offenders: Record<string, string>
 }
 
 /** Tags out, entities to spaces, whitespace collapsed. */
@@ -324,14 +331,16 @@ const ATTR = (name: string, tag: string): string => {
 export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
   const failures: string[] = []
   const samples: Record<string, string> = {}
+  const offenders: Record<string, string> = {}
   const body = plainText(input.html)
   const all = [input.title, input.metaDescription, body].join(' | ')
   const lines = sentences(all)
 
   /** Record the failure, and the words that tripped it. */
-  const refuse = (code: string, sentence?: string, at = 0): void => {
+  const refuse = (code: string, sentence?: string, at = 0, whole?: string): void => {
     failures.push(code)
     if (sentence && !samples[code]) samples[code] = sampleOf(sentence, at)
+    if ((whole ?? sentence) && !offenders[code]) offenders[code] = (whole ?? sentence) as string
   }
   /** The first sentence a whole-text pattern matched, and where in it. */
   const firstMatch = (re: RegExp): { sentence: string; at: number } | undefined => {
@@ -349,7 +358,7 @@ export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
     for (const line of lines) {
       const clean = withoutPercentScale(line)
       const m = PERCENT.exec(clean)
-      if (m) { refuse('percentage_claim', clean, m.index); break }
+      if (m) { refuse('percentage_claim', clean, m.index, line); break }
     }
   }
   if (COUNT_AFTER.test(all) || COUNT_BEFORE.test(all)) {
@@ -359,7 +368,7 @@ export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
     const clean = withoutAdSpendCadence(line)
     const m = CADENCE.exec(clean)
     if (m && !CADENCE_NOT_NEEDED.test(clean)) {
-      refuse('tracking_cadence_claim', clean, m.index)
+      refuse('tracking_cadence_claim', clean, m.index, line)
       break
     }
   }
@@ -383,7 +392,7 @@ export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
     if (!/\bnofollow\b/i.test(ATTR('rel', tag))) refuse('shopify_link_not_nofollow', tag)
   }
 
-  return { ok: failures.length === 0, failures: [...new Set(failures)], samples }
+  return { ok: failures.length === 0, failures: [...new Set(failures)], samples, offenders }
 }
 
 /**

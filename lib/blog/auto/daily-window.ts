@@ -198,7 +198,7 @@ export async function runBlogDailyWindow(
     // leaves it to the next quarter of an hour rather than dying mid-publish.
     if (Date.now() >= options.deadlineAt) return RESULT('no_time', locale)
 
-    const summary = await runBlogAutoPublish(admin, { locale })
+    const summary = await runBlogAutoPublish(admin, { locale, deadlineAt: options.deadlineAt })
     console.log('[blog-window] run complete', {
       locale,
       published: summary.published?.slug ?? null,
