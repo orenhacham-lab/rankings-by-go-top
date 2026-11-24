@@ -924,9 +924,10 @@ async function main() {
     // hour (lib/blog/auto/window-hours.ts). 11 is the hour the silence check
     // owns and it must stay OUTSIDE the window, which is what this asserts
     // together with A1 of silent-morning.qa.ts.
-    check('J1: the morning window is 04:00-15:59 UTC and nothing else',
+    check('J1: the morning window is 04:00-16:59 UTC and nothing else',
       WINDOW_HOURS_UTC.every((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`)))
-      && ![3, 16, 17, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
+      && ![3, 17, 18, 23].some((h) => isInWindow(Date.parse(`2026-10-14T${String(h).padStart(2, '0')}:30:00Z`))))
+    check('J1b: the last hour is 16:xx UTC (24 Nov 2026: 12 passes for 11 languages lost two)', WINDOW_HOURS_UTC[WINDOW_HOURS_UTC.length - 1] === 16 && isInWindow(Date.parse('2026-10-14T16:59:00Z')) && !isInWindow(Date.parse('2026-10-14T17:00:00Z')))
     // J1b COUNTS HOURS, NOT RUNS, since PR 472. The pass gate lets one call an
     // hour reach the blog (lib/content/automation/pass-gate.ts) and the blog
     // writes one language per call, so an hour is one chance and the old
