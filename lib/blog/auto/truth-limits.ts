@@ -84,6 +84,14 @@ function sentences(text: string): string[] {
   return text.split(/(?<=[.!?׃:;•])\s+|(?<=[。！？])\s*|\s*\|\s*/).filter(Boolean)
 }
 
+/**
+ * A SCALE IS NOT A RESULT. "Organic Difficulty score (0-100%)" in a table about a
+ * competitor's keyword tool describes the range of a metric, not a gain we claim
+ * (measured 24 Nov 2026: the English "semrush keyword planner" row was refused
+ * three times on it and parked). Only the exact "0-100%" shape is read as a scale.
+ */
+const PERCENT_SCALE = /\b0\s*(?:[-–]|to|bis|a|à|de)\s*100\s*(?:%|percent|prozent|por\s?ciento|pour\s?cent)/gi
+const withoutPercentScale = (text: string): string => text.replace(PERCENT_SCALE, ' ')
 const PERCENT = /\d[\d.,]*\s*(%|אחוז(?:ים)?|percent|por\s?ciento|por\s?cento|pour\s?cent|pourcent|per\s?cento|prozent|procent|パーセント)/i
 const COUNT_AFTER = /\d[\d.,]*\s*\+?\s*(לקוחות|מנויים|עסקים|customers|clients|subscribers|businesses|clientes|suscriptores|negocios|assinantes|empresas|neg[óo]cios|abonn[ée]s|entreprises|clienti|abbonati|aziende|imprese|kunden|abonnenten|unternehmen|firmen|klanten|abonnees|bedrijven|klient(?:ów|y|ami)|klienci|abonent(?:ów|i)|firm(?:y|ę)?|przedsi[ęe]biorstw(?:a|)|顧客|ユーザー|企業|社)/i
 const COUNT_BEFORE = /(לקוחות|מנויים|customers|clients|clientes|clienti|kunden|klanten|klienci|顧客)\s*[:–-]?\s*\d/i
@@ -149,7 +157,7 @@ const ON_DEMAND = /on\s+demand|on\s+request|per\s+request|upon\s+request|separat
  * It was the shape predicted when ON_DEMAND shipped, and it cost the English
  * locale its day.
  */
-const PER_QUESTION = /single[-\s](?:question|quer(?:y|ies)|prompt)|one[-\s]off|per[-\s](?:question|quer(?:y|ies)|prompt)|question[-\s]by[-\s]question|one\s+question\s+at\s+a\s+time|individual\s+(?:check|checks|quer|question)|consultas?\s+individual|verifiche?\s+singol|einzelabfrage|einzelne\s+abfrage|afzonderlijke\s+vraag|pojedyncz|requ[êe]tes?\s+ponctuelle|ponctuel|בדיק(?:ה|ות)\s+בודד|שאל(?:ה|ות)\s+בודד|単発|都度/i
+const PER_QUESTION = /single[-\s](?:question|quer(?:y|ies)|prompt)|one[-\s]off|per[-\s](?:question|quer(?:y|ies)|prompt)|question[-\s]by[-\s]question|one\s+question\s+at\s+a\s+time|individual\s+(?:check|checks|quer|question)|consultas?\s+individual|verifiche?\s+singol|einzelabfrage|einzelne\s+abfrage|afzonderlijke\s+vraag|pojedyncz|requ[êe]tes?\s+ponctuelle|ponctuel|בדיק(?:ה|ות)\s+בודד|שאל(?:ה|ות)\s+בודד|単発|都度|specifieke\s+vra|losse\s+vra|(?:via|from|through)\s+(?:the|our)\s+menu|via\s+het\s+menu|z\s+(?:poziomu\s+)?menu|desde\s+el\s+men[úu]|depuis\s+le\s+menu|dal\s+menu|(?:[üu]ber|im)\s+(?:das\s+)?men[üu]|pelo\s+menu|בתפריט|מהתפריט/i
 const AUTOMATIC = /אוטומט|automatic|automátic|automatically|automatis|automatiqu|automatyczn|自動/i
 const RATING_WORDS = '(?:ביקורות|reviews|rese\u00f1as|avalia[\u00e7c][\u00f5o]es|avis|recensioni|bewertungen|rezensionen|beoordelingen|opinii|opinie|recenzji|\u30ec\u30d3\u30e5\u30fc|\u8a55\u4fa1|\u53e3\u30b3\u30df)'
 const RATING = new RegExp(
@@ -226,10 +234,23 @@ function deniedAt(sentence: string, index: number, length: number): boolean {
 }
 
 /**
+ * "BEWARE OF FIRMS THAT GUARANTEE POSITIONS" IS A WARNING, NOT A PROMISE.
+ *
+ * Measured 24 Nov 2026: the Polish row "pozycjonowanie strony www cena" was
+ * refused on advice to be wary of firms that make rigid promises of "gwarantowanych
+ * pozycji". Every honest article on SEO pricing says this, in every language, and
+ * the denial window above misses it when the warning verb, not a "not", carries it.
+ * A sentence that tells the reader to avoid, doubt or watch out for such promises
+ * is advice against them. A warning word in the same sentence exempts it; a claim
+ * in the NEXT sentence is still judged on its own.
+ */
+const WARNS_AGAINST_PROMISES = /\b(?:beware|avoid|be\s+wary|wary\s+of|red\s+flag|suspicious|warning\s+sign|steer\s+clear|cuidado|evita\w*|desconf\w+|sospech\w+|cuidado\s+com|evite\w*|desconfie\w*|m[ée]fiez|[ée]vit\w+|m[ée]fi\w+|attenzione|diffida\w*|evit\w+|vorsicht|misstrauisch|meide\w*|h[üu]te\w*|wees\s+voorzichtig|vermijd\w*|wantrouw\w*|oppas\w*)\b|unika\w*|uwaga|uwa[żz]aj\w*|ostro[żz]n\w*|nieufn\w*|podejrzan\w*|ostrze\w+|היזהר\w*|זהירות|חשוד\w*|הימנע\w*|להימנע|警戒|注意|避け|조심|주의|피하/i
+/**
  * Where this sentence PROMISES a ranking, rather than denying that one can be
  * promised: the index of the first undenied promise, or -1 when there is none.
  */
 function promiseIndex(sentence: string): number {
+  if (WARNS_AGAINST_PROMISES.test(sentence)) return -1
   GUARANTEE_G.lastIndex = 0
   for (let m = GUARANTEE_G.exec(sentence); m; m = GUARANTEE_G.exec(sentence)) {
     if (!deniedAt(sentence, m.index, m[0].length)) return m.index
@@ -324,7 +345,13 @@ export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
     refuse(code, hit?.sentence, hit?.at)
   }
 
-  if (PERCENT.test(all)) refuseMatch('percentage_claim', firstMatch(PERCENT))
+  if (PERCENT.test(withoutPercentScale(all))) {
+    for (const line of lines) {
+      const clean = withoutPercentScale(line)
+      const m = PERCENT.exec(clean)
+      if (m) { refuse('percentage_claim', clean, m.index); break }
+    }
+  }
   if (COUNT_AFTER.test(all) || COUNT_BEFORE.test(all)) {
     refuseMatch('customer_count_claim', firstMatch(COUNT_AFTER) ?? firstMatch(COUNT_BEFORE))
   }

@@ -422,6 +422,33 @@ async function main() {
       !/single[-\s]question|one[-\s]off|per[-\s]question/i.test(en))
   }
 
+  // ---------------------------------------------------------------------------
+  // J. 24 Nov 2026: three more true sentences that cost a language its pass.
+  // ---------------------------------------------------------------------------
+  console.log('\nJ. menu channel, warnings, scales')
+  {
+    const nl = 'De automatische controle loopt voor ChatGPT, Gemini en Google AI, terwijl u voor specifieke vragen ook Perplexity, Copilot en Grok kunt raadplegen via het menu.'
+    const pl = 'Sprawdzanie automatyczne obejmuje ChatGPT, Gemini i Google AI, a opcja z poziomu menu pozwala sprawdzić obecność również w Perplexity, Copilot i Grok.'
+    check('J: Dutch "voor specifieke vragen ... via het menu" publishes', !verdict(nl).failures.includes('ai_engine_coverage_claim'), verdict(nl).failures.join(','))
+    check('J: Polish "z poziomu menu ... Perplexity" publishes', !verdict(pl).failures.includes('ai_engine_coverage_claim'), verdict(pl).failures.join(','))
+    check('J: the coverage claim itself is still refused (Dutch)',
+      verdict('De automatische controle omvat Perplexity, Copilot en Grok.').failures.includes('ai_engine_coverage_claim'))
+    const warn = 'Należy unikać firm, które składają sztywne obietnice dotyczące gwarantowanych pozycji w określonym czasie.'
+    check('J: a Polish warning against guaranteed positions publishes', !verdict(warn).failures.includes('ranking_guarantee'), verdict(warn).failures.join(','))
+    check('J: English "beware of agencies that guarantee rankings" publishes',
+      !verdict('Beware of agencies that guarantee first position on Google.').failures.includes('ranking_guarantee'))
+    check('J: a promise in the sentence AFTER the warning is still refused',
+      verdict('Avoid cheap agencies. We guarantee the first position on Google.').failures.includes('ranking_guarantee'))
+    check('J: and a bare promise is still refused',
+      verdict('Gwarantujemy pierwsze miejsce w Google.').failures.includes('ranking_guarantee'))
+    check('J: "Organic Difficulty score (0-100%)" is a scale and publishes',
+      !verdict('Organic Difficulty score (0-100%) is shown for every keyword.').failures.includes('percentage_claim'))
+    check('J: but "traffic grew 40%" is still refused',
+      verdict('Our clients saw traffic grow 40% in a month.').failures.includes('percentage_claim'))
+    check('J: and a result next to a scale is still refused',
+      verdict('Score range (0-100%). Our clients gain 35% more traffic.').failures.includes('percentage_claim'))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }
