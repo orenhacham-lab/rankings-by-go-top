@@ -68,7 +68,11 @@ export function classifyUserAgent(userAgent: string | null | undefined): Request
  */
 export function botToken(userAgent: string | null | undefined): string {
   const m = /([A-Za-z0-9_.-]*(?:bot|crawl|spider|slurp|scrape|fetch|monitor)[A-Za-z0-9_.-]*)/i.exec(userAgent ?? '')
-  return m ? m[1].slice(0, 24) : '-'
+  if (m) return m[1].slice(0, 24)
+  // No product token: say which generic word made it a machine (headless,
+  // python-requests, curl, ...), so "-" no longer hides the biggest group.
+  const g = GENERIC_BOT.exec(userAgent ?? '')
+  return g ? g[0].toLowerCase().slice(0, 24) : '-'
 }
 
 /** The line, or null when this request is not in the sample. Pure, so it can be tested without a request. */
