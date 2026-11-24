@@ -391,6 +391,37 @@ async function main() {
     check('MUTATION: the old pattern refused the budget sentence (so H would fail)', OLD.test(stored))
   }
 
+  // ---------------------------------------------------------------------------
+  // I. 23 Nov 2026: advice that daily checks are unnecessary, and "single-query"
+  //    checks for the other engines, are true sentences that were refused.
+  // ---------------------------------------------------------------------------
+  console.log('\nI. cadence advice and single-query checks')
+  {
+    const ja = '検索順位は毎日チェックしたほうがよいですか？ 毎日の順位確認は日々の変動による不要な迷いを生みやすいため、通常は月1回程度の定期的な計測で十分です。大規模なページ改修の直後など、ピンポイントで結果を確かめたい場面でのみ手動スキャンを併用します。'
+    check('I: the Japanese "daily checks are unnecessary" answer publishes',
+      !verdict(ja).failures.includes('tracking_cadence_claim'), verdict(ja).failures.join(','))
+    check('I: English "daily tracking is not necessary" publishes',
+      !verdict('Daily tracking is not necessary for most small sites.').failures.includes('tracking_cadence_claim'))
+    check('I: Spanish "el seguimiento diario no es necesario" publishes',
+      !verdict('El seguimiento diario no es necesario para un sitio pequeño.').failures.includes('tracking_cadence_claim'))
+    check('I: but "our daily tracking is enough" is still refused',
+      verdict('Our daily tracking is enough for any site.').failures.includes('tracking_cadence_claim'))
+    check('I: a claim in the NEXT sentence is not covered by a denial in the previous one',
+      verdict('Daily tracking is not necessary. We offer daily tracking of every keyword.').failures.includes('tracking_cadence_claim'))
+    check('I: Japanese: a claim after the denial, in its own sentence, is still refused',
+      verdict('毎日の順位確認は不要です。当社のシステムは毎日の順位追跡を提供します。').failures.includes('tracking_cadence_claim'))
+    const en = 'The automatic check covers ChatGPT, Gemini and Google AI automatically, with single-query checks available for Perplexity, Copilot, and Grok via the menu.'
+    check('I: "single-query checks" for the other engines publishes',
+      !verdict(en).failures.includes('ai_engine_coverage_claim'), verdict(en).failures.join(','))
+    check('I: and the coverage claim itself is still refused',
+      verdict('Our automatic check includes Perplexity, Copilot and Grok.').failures.includes('ai_engine_coverage_claim'))
+    // MUTATION CONTROLS — the pre-fix patterns refuse both real sentences.
+    check('MUTATION: without the not-needed reading the Japanese answer is refused (so I would fail)',
+      /(毎日|毎週|日次|週次)[^。]{0,8}(追跡|計測|スキャン|順位)/i.test(ja))
+    check('MUTATION: the old per-question pattern missed "single-query"',
+      !/single[-\s]question|one[-\s]off|per[-\s]question/i.test(en))
+  }
+
   console.log(`\n${pass} passed, ${fail} failed`)
   if (fail > 0) process.exitCode = 1
 }

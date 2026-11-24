@@ -81,7 +81,7 @@ export function plainText(html: string): string {
 
 /** Sentence-ish units, so "same sentence" rules do not reach across a paragraph. */
 function sentences(text: string): string[] {
-  return text.split(/(?<=[.!?׃:;•])\s+|\s*\|\s*/).filter(Boolean)
+  return text.split(/(?<=[.!?׃:;•])\s+|(?<=[。！？])\s*|\s*\|\s*/).filter(Boolean)
 }
 
 const PERCENT = /\d[\d.,]*\s*(%|אחוז(?:ים)?|percent|por\s?ciento|por\s?cento|pour\s?cent|pourcent|per\s?cento|prozent|procent|パーセント)/i
@@ -102,6 +102,21 @@ const CADENCE = /(מעקב|בדיקה|סריקה)\s+(יומי|יומית|שבו�
  */
 const AD_SPEND_CADENCE = /(?:מעקב|בדיקה|סריקה)\s+(?:יומי|יומית|שבועי|שבועית)(?:\s+או\s+(?:יומי|יומית|שבועי|שבועית))?\s+אחר\s+(?:ה)?(?:תקציב|עלות|עלויות|הוצאות|הוצאה|קליקים|קליק)/g
 const withoutAdSpendCadence = (text: string): string => text.replace(AD_SPEND_CADENCE, ' ')
+/**
+ * "DAILY CHECKS ARE NOT NEEDED" IS NOT "OUR CHECKS ARE DAILY".
+ *
+ * Measured 23 November 2026: the Japanese row "seo チェック ツール 無料" was
+ * refused at attempt 2 on an answer to "should I check my ranking every day?" —
+ * daily checks breed needless worry, a monthly measurement is usually enough.
+ * That sentence says the opposite of the claim the rule guards, and it is the
+ * advice our own retry brief asks the model to give. A sentence that names a
+ * daily or weekly cadence and, in the same breath, says it is unnecessary is
+ * advice about the reader's habit, not a statement about our product.
+ *
+ * Only a plain "not needed" word exempts it. "Sufficient" and "enough" do not:
+ * "our daily tracking is enough" is exactly the claim.
+ */
+const CADENCE_NOT_NEEDED = /not\s+(?:necessary|needed|required|worth)|unnecessary|no\s+need|(?:don'?t|doesn'?t|do\s+not|does\s+not)\s+need|לא\s+צריך|אין\s+צורך|אין\s+טעם|מיותר|לא\s+נחוץ|no\s+es\s+necesari[oa]|innecesari|no\s+hace\s+falta|no\s+necesitas|n[ãa]o\s+[ée]\s+necess[áa]ri[oa]|desnecess[áa]ri|n[ãa]o\s+precisa|pas\s+n[ée]cessaire|inutile|pas\s+besoin|non\s+[èe]\s+necessari[oa]|non\s+serve|nicht\s+(?:n[öo]tig|notwendig|erforderlich)|unn[öo]tig|niet\s+(?:nodig|noodzakelijk)|onnodig|nie\s+jest\s+konieczn|niepotrzebn|zb[ęe]dn|不要|必要(?:は|が)?(?:あり|な)|필요(?:가)?\s*없|불필요/i
 const OTHER_ENGINES = /perplexity|copilot|grok/i
 /**
  * HOW AN HONEST ARTICLE ACTUALLY DRAWS THE LINE.
@@ -134,7 +149,7 @@ const ON_DEMAND = /on\s+demand|on\s+request|per\s+request|upon\s+request|separat
  * It was the shape predicted when ON_DEMAND shipped, and it cost the English
  * locale its day.
  */
-const PER_QUESTION = /single[-\s]question|one[-\s]off|per[-\s]question|question[-\s]by[-\s]question|one\s+question\s+at\s+a\s+time|individual\s+(?:check|checks|quer|question)|consultas?\s+individual|verifiche?\s+singol|einzelabfrage|einzelne\s+abfrage|afzonderlijke\s+vraag|pojedyncz|requ[êe]tes?\s+ponctuelle|ponctuel|בדיק(?:ה|ות)\s+בודד|שאל(?:ה|ות)\s+בודד|単発|都度/i
+const PER_QUESTION = /single[-\s](?:question|quer(?:y|ies)|prompt)|one[-\s]off|per[-\s](?:question|quer(?:y|ies)|prompt)|question[-\s]by[-\s]question|one\s+question\s+at\s+a\s+time|individual\s+(?:check|checks|quer|question)|consultas?\s+individual|verifiche?\s+singol|einzelabfrage|einzelne\s+abfrage|afzonderlijke\s+vraag|pojedyncz|requ[êe]tes?\s+ponctuelle|ponctuel|בדיק(?:ה|ות)\s+בודד|שאל(?:ה|ות)\s+בודד|単発|都度/i
 const AUTOMATIC = /אוטומט|automatic|automátic|automatically|automatis|automatiqu|automatyczn|自動/i
 const RATING_WORDS = '(?:ביקורות|reviews|rese\u00f1as|avalia[\u00e7c][\u00f5o]es|avis|recensioni|bewertungen|rezensionen|beoordelingen|opinii|opinie|recenzji|\u30ec\u30d3\u30e5\u30fc|\u8a55\u4fa1|\u53e3\u30b3\u30df)'
 const RATING = new RegExp(
@@ -313,14 +328,13 @@ export function checkTruthLimits(input: TruthLimitInput): TruthLimitResult {
   if (COUNT_AFTER.test(all) || COUNT_BEFORE.test(all)) {
     refuseMatch('customer_count_claim', firstMatch(COUNT_AFTER) ?? firstMatch(COUNT_BEFORE))
   }
-  if (CADENCE.test(withoutAdSpendCadence(all))) {
-    let hit: { sentence: string; at: number } | undefined
-    for (const line of lines) {
-      const clean = withoutAdSpendCadence(line)
-      const m = CADENCE.exec(clean)
-      if (m) { hit = { sentence: clean, at: m.index }; break }
+  for (const line of lines) {
+    const clean = withoutAdSpendCadence(line)
+    const m = CADENCE.exec(clean)
+    if (m && !CADENCE_NOT_NEEDED.test(clean)) {
+      refuse('tracking_cadence_claim', clean, m.index)
+      break
     }
-    refuseMatch('tracking_cadence_claim', hit)
   }
   if (RATING.test(all)) refuseMatch('rating_claim', firstMatch(RATING))
   for (const line of lines) {
