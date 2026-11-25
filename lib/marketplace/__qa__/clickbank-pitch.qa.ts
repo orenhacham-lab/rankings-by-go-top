@@ -283,7 +283,7 @@ console.log('\nF) MUTATION CONTROLS')
     !/activation\.kind === 'claimable'/.test(unguarded))
   // C7c: a provider given a handoff nobody verified the signing of.
   check('F6c: C7c fails if clickbank were handed a signed handoff',
-    ({ thankyouHandoff: { orderIdField: 'order_id' } }).thankyouHandoff !== null)
+    ({ thankyouHandoff: { orderIdField: 'order_item_id' } }).thankyouHandoff !== null)
   // D3: the mandated text pasted into the page rather than attributed.
   const pasted = 'CLICKBANK® is a registered trademark of Click Sales, Inc., a Delaware corporation'
   check('F7: D3 fails when the mandated text is typed into a page',

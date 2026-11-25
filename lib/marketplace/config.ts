@@ -595,11 +595,18 @@ export const MARKETPLACE_PROVIDERS: readonly MarketplaceProvider[] = [
     /*
      * Verified from their own thank-you-page example script and from the
      * product's own settings: the four products pass the order data in plain
-     * language, so `order_id` arrives as a readable id, and the whole set is
-     * signed with the account's thank-you page key. See
-     * DIGISTORE24_THANKYOU_SCHEME.
+     * language, and the whole set is signed with the account's thank-you page
+     * key. See DIGISTORE24_THANKYOU_SCHEME.
+     *
+     * THE ID IS `order_item_id`, NOT `order_id`, AND THE DIFFERENCE IS WHAT
+     * MADE THE BUTTON NEVER APPEAR. The redirect carries both: `order_id` is
+     * the short alphanumeric code a buyer sees (LXUK7F2E on the 24.11.2026 test
+     * order) and `order_item_id` is the number (79461645). The webhook records
+     * a receipt under `order_item_id` (lib/marketplace/intake.ts), so a lookup
+     * by `order_id` verified the signature and then found no receipt. The two
+     * sides must name the same field; the guard suite compares them.
      */
-    thankyouHandoff: { signature: DIGISTORE24_THANKYOU_SCHEME, orderIdField: 'order_id' },
+    thankyouHandoff: { signature: DIGISTORE24_THANKYOU_SCHEME, orderIdField: 'order_item_id' },
     /* Their guide: only the literal text OK counts as a handled delivery. */
     acknowledgement: 'ok_text',
   },
