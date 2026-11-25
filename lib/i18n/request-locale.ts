@@ -175,7 +175,7 @@ export function isKoreanPath(pathname: string | null | undefined, enabled = kore
  */
 const PUBLIC_MARKETING_SEGMENTS = new Set([
   'about', 'accessibility', 'affiliates', 'affiliate-terms', 'ai-crawlers', 'articles', 'compare', 'features',
-  'free-check', 'pricing', 'privacy', 'refund-policy', 'sitemap', 'solutions', 'terms',
+  'data-deletion', 'free-check', 'pricing', 'privacy', 'refund-policy', 'sitemap', 'solutions', 'terms',
 ])
 
 /**

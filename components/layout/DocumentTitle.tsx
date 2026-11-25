@@ -12,11 +12,13 @@ import { usePathname } from 'next/navigation'
 import { navItemKeys, adminNavItems } from '@/components/layout/Sidebar'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { metaPostsText } from '@/lib/i18n/meta-posts'
+import type { PublicLocale } from '@/lib/i18n/locales'
 import { pageTitle, type TitledRoute } from '@/lib/shell/page-title'
 
-export function dashboardTitleRoutes(dict: ReturnType<typeof getDashboardDictionary>): TitledRoute[] {
+export function dashboardTitleRoutes(dict: ReturnType<typeof getDashboardDictionary>, uiLocale: PublicLocale = 'en'): TitledRoute[] {
   const label = (item: (typeof navItemKeys)[number]) =>
-    item.screenKey ? dict.contentHub.screens[item.screenKey] : dict.sidebar[item.labelKey]
+    item.metaLabel ? metaPostsText(uiLocale).navLabel : item.screenKey ? dict.contentHub.screens[item.screenKey] : dict.sidebar[item.labelKey]
   return [
     ...[...navItemKeys, ...adminNavItems].map((item) => ({ href: item.href, label: label(item) })),
     // Screens without a sidebar entry of their own.
@@ -28,7 +30,7 @@ export function dashboardTitleRoutes(dict: ReturnType<typeof getDashboardDiction
 export default function DocumentTitle() {
   const pathname = usePathname() ?? ''
   const { uiLocale } = useDashboardLanguage()
-  const title = pageTitle(pathname, dashboardTitleRoutes(getDashboardDictionary(uiLocale)))
+  const title = pageTitle(pathname, dashboardTitleRoutes(getDashboardDictionary(uiLocale), uiLocale))
   useEffect(() => {
     const apply = () => { if (document.title !== title) document.title = title }
     apply()

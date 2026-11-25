@@ -271,6 +271,7 @@ check('MUTATION — an English-only extra section is caught', pages.he.terms.h2 
     'cdn.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'partners.shopify.com': { en: /Shopify/, he: /Shopify/ },
     'supabase.com': { en: /Supabase/, he: /Supabase/ },
+    // Conversions API, and the Facebook and Instagram posts the user chooses to publish (Go Top SEO Publisher): same host.
     'graph.facebook.com': { en: /Conversions API/, he: /Conversions API/ },
     // The browser pixel. It used to be a tag inside the GTM container, where no
     // host literal reached this guard; it is our code now, so the guard sees it
