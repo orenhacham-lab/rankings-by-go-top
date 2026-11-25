@@ -43,9 +43,10 @@ export class MetaApiError extends Error {
  * status, error.code, error.error_subcode) and never error.message or
  * error.error_user_msg.
  *
- * The code numbers are the ones Meta documents for the Graph API error
- * reference; they were NOT re-verified against the live reference when this was
- * written, so an unknown number falls to `unexpected` rather than a guess.
+ * Checked against Meta's error pages on 2026-11-25: 190, 4, 17, 10, 200-299, 368 (generic table),
+ * 9007 / 2207027 (media not ready). 32 and 613 come from the rate-limiting page. 100 and the photo
+ * subcodes 2207004/5/9/52 are NOT confirmed there (2207026 is a VIDEO format error and is not used).
+ * An unknown number falls to `unexpected` rather than a guess.
  */
 export function classifyGraphError(httpStatus: number, json: unknown): MetaApiError {
   const e = (json && typeof json === 'object' ? (json as { error?: unknown }).error : null) as
@@ -62,7 +63,7 @@ export function classifyGraphError(httpStatus: number, json: unknown): MetaApiEr
   // Instagram: the uploaded photo is not ready yet.
   if (sub === 2207027 || code === 9007) return new MetaApiError('meta_unavailable', true)
   // Instagram: the photo's format or size is not accepted.
-  if (sub === 2207026 || sub === 2207004 || sub === 2207005 || sub === 2207009 || sub === 2207052) return new MetaApiError('image_rejected')
+  if (sub === 2207004 || sub === 2207005 || sub === 2207009 || sub === 2207052) return new MetaApiError('image_rejected')
   // The app lacks the permission, or has not passed App Review for it.
   if (code === 10 || (code !== null && code >= 200 && code <= 299)) return new MetaApiError('permission_denied')
   // The action was blocked by Meta's integrity systems.

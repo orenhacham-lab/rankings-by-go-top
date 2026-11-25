@@ -13,8 +13,8 @@
  *
  * The app id, the app secret and the redirect URI are server env vars and are
  * never derived from a request. The Graph API version is pinned here and can be
- * overridden with META_GRAPH_VERSION; it was NOT verified against Meta's
- * changelog when written, so the owner confirms it before the first App Review.
+ * overridden with META_GRAPH_VERSION; it was checked against Meta's changelog on 2026-11-25
+ * (latest: v27.0, introduced 2026-11-04); re-check it before each App Review.
  */
 
 /**
@@ -37,7 +37,7 @@ export const META_SCOPES = [
 /** The permissions without which the connection is of no use. */
 export const META_REQUIRED_SCOPES = ['pages_show_list', 'pages_manage_posts'] as const
 
-export const META_DEFAULT_GRAPH_VERSION = 'v23.0'
+export const META_DEFAULT_GRAPH_VERSION = 'v27.0'
 
 export function metaGraphVersion(): string {
   const v = process.env.META_GRAPH_VERSION?.trim()

@@ -73,7 +73,8 @@ async function main() {
   check('4/17/32/613 → rate_limited, retryable', [4, 17, 32, 613].every((c) => cls(400, c).code === 'rate_limited' && cls(400, c).retryable))
   check('5xx and code 2 → meta_unavailable, retryable', cls(503).code === 'meta_unavailable' && cls(500, 2).retryable)
   check('a missing permission → permission_denied', cls(400, 10).code === 'permission_denied' && cls(400, 200).code === 'permission_denied')
-  check('a rejected photo → image_rejected', cls(400, 100, 2207026).code === 'image_rejected')
+  check('a rejected photo → image_rejected', cls(400, 100, 2207004).code === 'image_rejected')
+  check('2207026 (a video-format error) is not treated as a photo problem', cls(400, 352, 2207026).code === 'unexpected')
   check('an unknown number → unexpected, never a guess', cls(400, 123456).code === 'unexpected')
   check('no provider words survive in the error', !JSON.stringify(cls(400, 190)).includes('SECRET WORDS'))
 
