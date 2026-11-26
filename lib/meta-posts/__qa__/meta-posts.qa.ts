@@ -237,6 +237,30 @@ async function main() {
   const broken = { ...META_POSTS_TEXT.fr } as Record<string, string>; delete broken[keys[0]]
   check('MUTATION — a language missing a key is caught', keys.filter((k) => typeof broken[k] !== 'string' || !broken[k].trim()).length === 1)
 
+  // ── Pages granted through a Business Portfolio ─────────────────────────
+  console.log('Pages that /me/accounts does not list')
+  const O = require('../oauth') as typeof import('../oauth')
+  const calls: { url: string; auth: string | null }[] = []
+  const mkFetch = (accounts: unknown[]) => (async (url: string, init?: RequestInit) => {
+    const auth = (init?.headers as Record<string, string> | undefined)?.Authorization ?? null
+    calls.push({ url, auth })
+    const body = url.includes('/me/accounts') ? { data: accounts }
+      : url.includes('/debug_token') ? { data: { granular_scopes: [{ scope: 'pages_show_list', target_ids: ['112080178267908'] }, { scope: 'pages_manage_posts', target_ids: ['112080178267908', 'x1'] }] } }
+      : url.includes('/112080178267908') ? { id: '112080178267908', name: 'Go Top SEO', access_token: 'PAGE', instagram_business_account: { id: '1784', username: 'gotopil' } }
+      : { error: { code: 100 } }
+    return new Response(JSON.stringify(body), { status: 'error' in body ? 400 : 200 })
+  }) as unknown as typeof fetch
+  const viaGrants = await O.listMetaPages('USERTOKEN', mkFetch([]))
+  check('an empty /me/accounts falls back to the Pages the person ticked', viaGrants.length === 1 && viaGrants[0].pageId === '112080178267908' && viaGrants[0].igUsername === 'gotopil')
+  const dbg = calls.find((c) => c.url.includes('/debug_token'))
+  check('the app secret goes in a header, never in the URL', !!dbg && /^Bearer 1234567890\|/.test(dbg.auth ?? '') && !dbg.url.includes('app-secret-for-tests'))
+  calls.length = 0
+  const direct = await O.listMetaPages('USERTOKEN', mkFetch([{ id: '555', name: 'Direct', access_token: 'T' }]))
+  check('a direct Page role is used as before, with no fallback call', direct.length === 1 && direct[0].pageId === '555' && !calls.some((c) => c.url.includes('/debug_token')))
+  // MUTATION: when Meta refuses the fallback the list is empty, not a crash, and the guard above would fail on it.
+  const refused = (async (url: string) => new Response(JSON.stringify(url.includes('/me/accounts') ? { data: [] } : { error: { code: 190 } }), { status: url.includes('/me/accounts') ? 200 : 400 })) as unknown as typeof fetch
+  check('MUTATION — a refused fallback gives an empty list, which the fallback check would catch', (await O.listMetaPages('USERTOKEN', refused)).length === 0)
+
   console.log(`\n${pass} passed, ${fail} failed`)
   process.exitCode = fail ? 1 : 0
 }
