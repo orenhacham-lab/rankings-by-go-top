@@ -302,7 +302,7 @@ export const aiVisibilityIt: DeepPartial<DashboardDictionary> = {
     connect: {
       overline: 'Passo 1',
       title: 'Colleghi la scheda Google Business Profile',
-      body: 'A Google chiediamo un solo permesso: gestire la scheda dell’attività. Pubblichiamo solo ciò che viene approvato e non modifichiamo mai gli orari, l’indirizzo o gli altri dati.',
+      body: 'A Google chiediamo un solo permesso: gestire la scheda dell’attività. La password di Google non arriva mai a noi. Pubblichiamo solo ciò che viene approvato (o ogni nuovo articolo, se è attiva la pubblicazione automatica) e non modifichiamo mai gli orari, l’indirizzo o gli altri dati.',
       points: [
         'Questa connessione è indipendente da Search Console e può essere revocata in qualsiasi momento.',
         'Il permesso viene salvato cifrato.',

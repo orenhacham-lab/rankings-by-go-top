@@ -311,7 +311,7 @@ export const aiVisibilityKo: DeepPartial<DashboardDictionary> = {
     connect: {
       overline: '1단계',
       title: 'Google 비즈니스 프로필을 연결해 주세요',
-      body: 'Google에 요청하는 권한은 비즈니스 프로필 관리 하나뿐입니다. 승인된 내용만 발행하며, 영업시간이나 주소 등 다른 정보는 절대 바꾸지 않습니다.',
+      body: 'Google에 요청하는 권한은 비즈니스 프로필 관리 하나뿐입니다. Google 비밀번호는 저희에게 전달되지 않습니다. 승인된 내용(자동 게시를 켠 경우에는 새 글마다)만 발행하며, 영업시간이나 주소 등 다른 정보는 절대 바꾸지 않습니다.',
       points: [
         '이 연결은 Search Console과 별개이며 언제든 철회하실 수 있습니다.',
         '권한 정보는 암호화해 저장합니다.',

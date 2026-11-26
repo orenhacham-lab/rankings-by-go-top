@@ -298,7 +298,7 @@ export const aiVisibilityFr: DeepPartial<DashboardDictionary> = {
     connect: {
       overline: 'Étape 1',
       title: 'Connectez votre fiche Google Business Profile',
-      body: 'Nous demandons à Google une seule permission : gérer votre fiche d’entreprise. Nous ne publions que ce que vous approuvez, et nous ne changeons jamais vos horaires, votre adresse ni vos autres informations.',
+      body: 'Nous demandons à Google une seule permission : gérer votre fiche d’entreprise. Votre mot de passe Google ne nous parvient jamais. Nous ne publions que ce que vous approuvez (ou chaque nouvel article, si vous activez la publication automatique), et nous ne changeons jamais vos horaires, votre adresse ni vos autres informations.',
       points: [
         'Cette connexion est indépendante de Search Console et vous pouvez la retirer à tout moment.',
         'La permission est enregistrée chiffrée.',

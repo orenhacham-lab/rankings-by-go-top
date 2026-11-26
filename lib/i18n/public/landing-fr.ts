@@ -40,7 +40,7 @@ export const landingFr: LandingCopy = {
     checkLead: 'Pas encore prêt à créer un compte ? Faites un audit gratuit de votre site, sans inscription :',
     dashboard: 'Aller à mon tableau de bord',
     trust: ['Publie sur WordPress, Shopify et Wix', 'Une assistance assurée par de vraies personnes'],
-    climbChip: '3e position dans Google',
+    climbChip: 'En hausse dans Google',
     published: 'Article publié sur votre site',
   },
   demo: {
@@ -48,7 +48,7 @@ export const landingFr: LandingCopy = {
     caption: 'Démonstration du produit. Les noms d’entreprises et les chiffres sont des exemples.',
     tabs: ['La remontée dans Google', 'Un nouvel article', 'Recommandé par les IA'],
     describe: [
-      'L’écran des mots-clés : une expression passée de la 18e à la 3e position dans Google, et trois autres en progression.',
+      'L’écran des mots-clés : des expressions en progression dans Google, avec l’évolution à côté de chacune.',
       'L’écran des articles : un nouvel article est rédigé, passe le contrôle qualité et attend sa publication programmée sur le site.',
       'L’écran de visibilité dans les IA : une réponse de ChatGPT qui recommande l’entreprise, et les moteurs qui la citent.',
     ],

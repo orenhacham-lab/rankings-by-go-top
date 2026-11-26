@@ -35,7 +35,7 @@ export const landingPtBR: LandingCopy = {
     checkLead: 'Ainda na dúvida? Faça uma análise gratuita do seu site, sem cadastro:',
     dashboard: 'Ir para o meu painel',
     trust: ['Publica no WordPress, na Shopify e no Wix', 'Suporte feito por pessoas de verdade'],
-    climbChip: '3º lugar no Google',
+    climbChip: 'Subindo no Google',
     published: 'Artigo publicado no seu site',
   },
   demo: {
@@ -43,7 +43,7 @@ export const landingPtBR: LandingCopy = {
     caption: 'Demonstração do produto. Os nomes de empresas e os números são exemplos.',
     tabs: ['Subindo no Google', 'Um artigo novo', 'Recomendado pela IA'],
     describe: [
-      'A tela de palavras-chave: um termo que subiu da 18ª para a 3ª posição no Google, e outros três em alta.',
+      'A tela de palavras-chave: termos que subiram no Google, com a variação ao lado de cada um.',
       'A tela de artigos: um artigo novo é escrito, passa pelo controle de qualidade e fica agendado para ser publicado no site.',
       'A tela de visibilidade em IA: uma resposta do ChatGPT que recomenda a empresa, e os motores que a mencionam.',
     ],

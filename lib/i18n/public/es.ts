@@ -30,7 +30,7 @@ export const es = {
     featuresMenu: {
       contentPublishing: {
         label: 'Creación, programación y publicación de contenido',
-        description: 'Crea, programa y publica contenido SEO y GEO desde la propia plataforma, junto al seguimiento de posiciones y de visibilidad.',
+        description: 'Crea, programa y publica artículos desde la propia plataforma, junto al seguimiento de posiciones y de visibilidad.',
       },
       googleOrganic: {
         label: 'Seguimiento de posiciones en Google',
@@ -45,7 +45,7 @@ export const es = {
         description: 'Descubre si la IA menciona tu negocio en las respuestas de ChatGPT, Gemini, Perplexity y Google AI.',
       },
       reports: {
-        label: 'Informes SEO y GEO',
+        label: 'Informes de posiciones e IA',
         description: 'Genera informes profesionales en PDF y Excel para tus clientes, con posiciones, tendencias y datos de visibilidad.',
       },
       keywordResearch: {

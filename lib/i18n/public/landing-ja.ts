@@ -48,7 +48,7 @@ export const landingJa: LandingCopy = {
     checkLead: 'アカウント作成はまだ早いという方へ。登録なしで、サイトを無料診断します：',
     dashboard: 'ダッシュボード',
     trust: ['WordPress、Shopify、Wixに公開', '担当者による人のサポート'],
-    climbChip: 'Googleで3位',
+    climbChip: 'Googleで上昇中',
     published: '記事をサイトに公開しました',
   },
   demo: {
@@ -56,7 +56,7 @@ export const landingJa: LandingCopy = {
     caption: '製品のデモです。会社名と数値は例示です。',
     tabs: ['Googleでの上昇', '新しい記事', 'AIに推薦される'],
     describe: [
-      'キーワードの画面です。ある検索語がGoogleの18位から3位に上がり、ほかに3語も上昇しています。',
+      'キーワードの画面です。Googleで順位が上がった検索語と、それぞれの変化が表示されます。',
       '記事の画面です。新しい記事が作成され、品質チェックを通過し、サイトへの予約公開を待っています。',
       'AIでの可視性の画面です。ChatGPTの回答がこの会社を推薦しており、引用しているエンジンも並んでいます。',
     ],

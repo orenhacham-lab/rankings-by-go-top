@@ -67,7 +67,14 @@ export type PricingCopy = {
     everyPlan: string[]
   }
   unsure: { text: string; cta: string }
-  included: { eyebrow: string; title: string; body: string; items: Item[] }
+  included: {
+    eyebrow: string
+    title: string
+    body: string
+    items: Item[]
+    /** What the plans do not cover, said once under the grid so nobody assumes it. */
+    notIncluded: { title: string; items: string[] }
+  }
   value: { eyebrow: string; title: string; body: string; items: Item[] }
   usage: { eyebrow: string; title: string; body: string; items: Item[]; note: string }
   faq: {
@@ -133,6 +140,14 @@ export function PricingIncluded({ copy }: { copy: PricingCopy }) {
           </Rise>
         ))}
       </ul>
+      <div className="mt-6 rounded-card border border-line bg-canvas p-5 sm:mt-8 sm:p-6" data-not-included>
+        <h3 className="text-section font-semibold text-ink">{c.notIncluded.title}</h3>
+        <ul className="mt-3 list-disc space-y-1.5 ps-5 text-copy text-body">
+          {c.notIncluded.items.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
     </Section>
   )
 }

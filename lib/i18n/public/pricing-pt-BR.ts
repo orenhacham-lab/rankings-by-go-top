@@ -90,6 +90,13 @@ export const pricingPtBR: PricingCopy = {
         desc: 'Quem responde são pessoas de verdade, pelo WhatsApp e por e-mail.',
       },
     ],
+    notIncluded: {
+      title: 'O que não está incluído',
+      items: [
+        'Gestão de anúncios pagos. Os planos cobrem conteúdo, acompanhamento e relatórios, não campanhas de anúncios.',
+        'O controle de em que posição você aparece. Isso é decidido pelo Google e pelos motores de IA, não por nós. Publicamos, medimos e mostramos o resultado.',
+      ],
+    },
   },
   value: {
     eyebrow: 'Por que vale a pena',

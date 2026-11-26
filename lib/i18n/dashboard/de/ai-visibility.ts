@@ -303,7 +303,7 @@ export const aiVisibilityDe: DeepPartial<DashboardDictionary> = {
     connect: {
       overline: 'Schritt 1',
       title: 'Verbinden Sie das Google Unternehmensprofil',
-      body: 'Von Google verlangen wir eine einzige Berechtigung: das Unternehmensprofil zu verwalten. Wir veröffentlichen nur, was freigegeben ist, und ändern niemals Öffnungszeiten, Adresse oder andere Angaben.',
+      body: 'Von Google verlangen wir eine einzige Berechtigung: das Unternehmensprofil zu verwalten. Ihr Google-Passwort erreicht uns nie. Wir veröffentlichen nur, was freigegeben ist (oder jeden neuen Artikel, wenn das automatische Posten eingeschaltet ist), und ändern niemals Öffnungszeiten, Adresse oder andere Angaben.',
       points: [
         'Diese Verbindung ist von der Search Console unabhängig und lässt sich jederzeit widerrufen.',
         'Die Berechtigung wird verschlüsselt gespeichert.',

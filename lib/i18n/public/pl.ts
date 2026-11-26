@@ -59,7 +59,7 @@ export const pl = {
     featuresMenu: {
       contentPublishing: {
         label: 'Pisanie, planowanie i publikowanie treści',
-        description: 'Pisanie, planowanie i publikowanie treści SEO i GEO wprost z platformy, obok pomiaru pozycji i widoczności.',
+        description: 'Pisanie, planowanie i publikowanie artykułów wprost z platformy, obok pomiaru pozycji i widoczności.',
       },
       googleOrganic: {
         label: 'Monitorowanie pozycji w Google',
@@ -74,7 +74,7 @@ export const pl = {
         description: 'Sprawdzenie, czy Państwa firma jest wymieniana w odpowiedziach ChatGPT, Gemini, Perplexity i Google AI.',
       },
       reports: {
-        label: 'Raporty SEO i GEO',
+        label: 'Raporty o pozycjach i AI',
         description: 'Raporty w formacie PDF i Excel dla Państwa klientów, z pozycjami, przebiegiem i danymi o widoczności.',
       },
       keywordResearch: {

@@ -46,7 +46,7 @@ export const ja = {
     featuresMenu: {
       contentPublishing: {
         label: 'コンテンツの作成、予約、公開',
-        description: 'SEOとGEOのコンテンツの作成、公開予約、公開を、順位と可視性の計測とあわせて、プラットフォームから直接行えます。',
+        description: '記事の作成、公開予約、公開を、順位と可視性の計測とあわせて、プラットフォームから直接行えます。',
       },
       googleOrganic: {
         label: 'Googleでの検索順位の計測',
@@ -61,7 +61,7 @@ export const ja = {
         description: 'ChatGPT、Gemini、Perplexity、Google AIの回答で、自社が引用されているかを確認します。',
       },
       reports: {
-        label: 'SEOとGEOのレポート',
+        label: '順位とAIのレポート',
         description: '順位、推移、可視性のデータを含む業務用のレポートを、PDFとExcelで取引先にお渡しいただけます。',
       },
       keywordResearch: {

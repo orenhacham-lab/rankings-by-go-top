@@ -43,7 +43,7 @@ export const landingIt: LandingCopy = {
     checkLead: 'Non è ancora il momento di creare un account? Analisi gratuita del sito, senza registrazione:',
     dashboard: 'La mia dashboard',
     trust: ['Pubblica su WordPress, Shopify e Wix', 'Un’assistenza affidata a persone reali'],
-    climbChip: '3ª posizione in Google',
+    climbChip: 'In crescita su Google',
     published: 'Articolo pubblicato sul Suo sito',
   },
   demo: {
@@ -51,7 +51,7 @@ export const landingIt: LandingCopy = {
     caption: 'Dimostrazione del prodotto. I nomi delle aziende e i numeri sono esempi.',
     tabs: ['La risalita in Google', 'Un nuovo articolo', 'Consigliati dalle IA'],
     describe: [
-      'La schermata delle parole chiave: una frase passata dalla 18ª alla 3ª posizione in Google, e altre tre in crescita.',
+      'La schermata delle parole chiave: frasi salite su Google, con la variazione accanto a ciascuna.',
       'La schermata degli articoli: un nuovo articolo viene scritto, supera il controllo qualità e attende la pubblicazione programmata sul sito.',
       'La schermata della visibilità nelle IA: una risposta di ChatGPT che consiglia l’azienda, e i motori che la citano.',
     ],

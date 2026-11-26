@@ -56,7 +56,7 @@ export const ko = {
     featuresMenu: {
       contentPublishing: {
         label: '콘텐츠 작성, 예약, 발행',
-        description: 'SEO와 GEO 콘텐츠를 작성하고 예약하고 발행하면서, 순위와 가시성 변화를 한곳에서 함께 측정합니다.',
+        description: '글을 작성하고 예약하고 발행하면서, 순위와 가시성 변화를 한곳에서 함께 측정합니다.',
       },
       googleOrganic: {
         label: 'Google 검색 순위 측정',
@@ -71,7 +71,7 @@ export const ko = {
         description: 'ChatGPT, Gemini, Perplexity, Google AI의 답변에서 우리 업체가 인용되는지 확인합니다.',
       },
       reports: {
-        label: 'SEO와 GEO 리포트',
+        label: '순위와 AI 리포트',
         description: '순위와 추이, 가시성 데이터를 담은 실무용 리포트를 PDF와 Excel로 내보내 고객사에 전달할 수 있습니다.',
       },
       keywordResearch: {

@@ -92,6 +92,13 @@ export const pricingFr: PricingCopy = {
         desc: 'Ce sont de vraies personnes qui vous répondent, sur WhatsApp et par e-mail.',
       },
     ],
+    notIncluded: {
+      title: 'Ce qui n’est pas inclus',
+      items: [
+        'La gestion de publicités payantes. Les formules couvrent le contenu, le suivi et les rapports, pas les campagnes publicitaires.',
+        'La maîtrise de votre place dans les résultats. Elle dépend de Google et des moteurs d’IA, pas de nous. Nous publions, mesurons et vous montrons le résultat.',
+      ],
+    },
   },
   value: {
     eyebrow: 'Pourquoi cela vaut le coup',

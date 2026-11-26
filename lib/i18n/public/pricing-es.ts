@@ -90,6 +90,13 @@ export const pricingEs: PricingCopy = {
         desc: 'Te responden personas de verdad, por WhatsApp y por correo.',
       },
     ],
+    notIncluded: {
+      title: 'Qué no está incluido',
+      items: [
+        'Gestión de anuncios de pago. Los planes cubren contenido, seguimiento e informes, no campañas publicitarias.',
+        'El control de en qué puesto apareces. Eso lo deciden Google y los motores de IA, no nosotros. Publicamos, medimos y te mostramos el resultado.',
+      ],
+    },
   },
   value: {
     eyebrow: 'Por qué sale a cuenta',

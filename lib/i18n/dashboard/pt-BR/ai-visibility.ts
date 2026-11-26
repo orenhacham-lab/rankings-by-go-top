@@ -297,7 +297,7 @@ export const aiVisibilityPtBR: DeepPartial<DashboardDictionary> = {
     connect: {
       overline: 'Passo 1',
       title: 'Conecte o seu Perfil da Empresa no Google',
-      body: 'Pedimos ao Google uma única permissão: gerenciar o seu Perfil da Empresa. Só publicamos o que você aprova e nunca alteramos o seu horário, o seu endereço nem outros dados.',
+      body: 'Pedimos ao Google uma única permissão: gerenciar o seu Perfil da Empresa. A sua senha do Google nunca chega até nós. Só publicamos o que você aprova (ou cada novo artigo, se você ativar a publicação automática) e nunca alteramos o seu horário, o seu endereço nem outros dados.',
       points: [
         'Esta conexão é independente do Google Search Console e você pode desconectá-la quando quiser.',
         'A permissão é salva criptografada.',

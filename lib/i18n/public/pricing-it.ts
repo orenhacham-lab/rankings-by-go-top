@@ -92,6 +92,13 @@ export const pricingIt: PricingCopy = {
         desc: 'Rispondono persone reali, su WhatsApp e per e-mail.',
       },
     ],
+    notIncluded: {
+      title: 'Cosa non è incluso',
+      items: [
+        'La gestione di annunci a pagamento. I piani coprono contenuti, monitoraggio e report, non le campagne pubblicitarie.',
+        'Il controllo sulla posizione in cui compare. Lo decidono Google e i motori di IA, non noi. Pubblichiamo, misuriamo e Le mostriamo il risultato.',
+      ],
+    },
   },
   value: {
     eyebrow: 'Perché conviene',

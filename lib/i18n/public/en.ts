@@ -19,7 +19,7 @@ export const en = {
     featuresMenu: {
       contentPublishing: {
         label: 'Content Creation, Scheduling & Publishing',
-        description: 'Create, schedule, and publish SEO and GEO content directly from the platform, alongside your rank and visibility tracking.',
+        description: 'Create, schedule, and publish articles directly from the platform, alongside your rank and visibility tracking.',
       },
       googleOrganic: {
         label: 'Google Organic Rank Tracking',
@@ -34,7 +34,7 @@ export const en = {
         description: 'Discover if your business is mentioned in AI answers from ChatGPT, Gemini, Perplexity, and Google AI.',
       },
       reports: {
-        label: 'SEO/GEO Reports',
+        label: 'Rankings & AI Reports',
         description: 'Generate professional PDF and Excel reports for your clients with rankings, trends, and visibility insights.',
       },
       keywordResearch: {
