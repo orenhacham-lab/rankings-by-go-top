@@ -29,6 +29,8 @@ import { cn } from '@/lib/utils'
 import { ButtonLink, CONTAINER, CONTAINER_WIDE, Eyebrow, FaqList, IconSquircle, Section, SectionIntro } from './marketing'
 import { HeroDemo, type HeroDemoCopy } from './landing/HeroDemo'
 import { HeroSignals } from './landing/HeroSignals'
+import { ChannelStack } from './landing/ChannelStack'
+import { ONE_SYSTEM_HERO, ONE_SYSTEM_HERO_LIVE } from '@/lib/marketing/one-system-hero'
 import { CtaClimb, FlowClimb, HeroClimb } from './landing/RankClimb'
 import { Counter, Flow, Rise } from './landing/motion'
 import {
@@ -111,6 +113,9 @@ export function LandingPage({
   const prefix = LOCALE_PREFIX[locale]
   const checkHref = `${prefix}/free-check`
   const startHref = signedIn ? '/dashboard' : signupHref
+  // The website + Maps + social hero replaces the old words only once posting to social is live.
+  const oneSystem = ONE_SYSTEM_HERO_LIVE ? ONE_SYSTEM_HERO[locale] : null
+  const heroWords = oneSystem ?? copy.hero
   const f = copy.features
   const featureRows: { row: FeatureRowCopy; visual: React.ReactNode }[] = [
     { row: f.content, visual: <ContentVisual copy={f.content.visual} /> },
@@ -139,12 +144,12 @@ export function LandingPage({
           <div className={cn(CONTAINER_WIDE, 'relative pt-28 pb-20 sm:pt-32 sm:pb-24 lg:pt-36 lg:pb-28')}>
             <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-8">
               <div className="lg:col-span-7">
-                <div className="mb-7"><Eyebrow icon={Sparkles} inverse prominent>{copy.hero.eyebrow}</Eyebrow></div>
+                <div className="mb-7"><Eyebrow icon={Sparkles} inverse prominent>{heroWords.eyebrow}</Eyebrow></div>
                 <h1 className="text-hero text-contrast-ink">
-                  {copy.hero.title}
-                  <span className="block text-rail-tagline">{copy.hero.accent}</span>
+                  {heroWords.title}
+                  <span className="block text-rail-tagline">{heroWords.accent}</span>
                 </h1>
-                <p className="mt-6 max-w-[54ch] text-lead-mkt text-contrast-ink/80 text-pretty">{copy.hero.subtitle}</p>
+                <p className="mt-6 max-w-[54ch] text-lead-mkt text-contrast-ink/80 text-pretty">{heroWords.subtitle}</p>
 
                 {/* The trial is the hero's primary action (w11). It was the outline button behind
                     an "or" while the free check held a lit, ring-2 field, so the page asked a cold
@@ -178,8 +183,8 @@ export function LandingPage({
                   ))}
                 </ul>
               </div>
-              <div className="hidden lg:col-span-5 lg:block">
-                <HeroSignals demo={copy.demo} published={copy.hero.published} />
+              <div className={cn('lg:col-span-5', !oneSystem && 'hidden lg:block')}>
+                {oneSystem ? <ChannelStack copy={oneSystem} /> : <HeroSignals demo={copy.demo} published={copy.hero.published} />}
               </div>
             </div>
           </div>
