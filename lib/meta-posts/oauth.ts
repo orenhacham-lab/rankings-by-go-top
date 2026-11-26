@@ -26,12 +26,15 @@ export function buildMetaAuthUrl(state: string): string {
 
 async function graphCall(
   method: 'GET' | 'POST' | 'DELETE', url: string, form: Record<string, string> | null, fetchImpl: FetchLike,
+  extraHeaders?: Record<string, string>,
 ): Promise<Record<string, unknown>> {
   let res: Response
   try {
+    const headers = { ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}), ...(extraHeaders ?? {}) }
     res = await fetchImpl(url, {
       method,
-      ...(form ? { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(form).toString() } : {}),
+      ...(Object.keys(headers).length ? { headers } : {}),
+      ...(form ? { body: new URLSearchParams(form).toString() } : {}),
     })
   } catch {
     throw new MetaApiError('meta_unavailable', true)
@@ -91,32 +94,69 @@ export interface MetaPage {
   igUsername: string | null
 }
 
+const PAGE_FIELDS = 'id,name,access_token,instagram_business_account{id,username}'
+
+function toMetaPage(row: unknown): MetaPage | null {
+  const r = row as { id?: unknown; name?: unknown; access_token?: unknown; instagram_business_account?: { id?: unknown; username?: unknown } } | null
+  if (!r || typeof r.id !== 'string' || !/^[0-9]{1,32}$/.test(r.id) || typeof r.access_token !== 'string' || !r.access_token) return null
+  const ig = r.instagram_business_account
+  const igId = ig && typeof ig.id === 'string' && /^[0-9]{1,32}$/.test(ig.id) ? ig.id : null
+  return {
+    pageId: r.id,
+    name: typeof r.name === 'string' && r.name ? r.name.slice(0, 300) : r.id,
+    accessToken: r.access_token,
+    igUserId: igId,
+    igUsername: igId && typeof ig?.username === 'string' ? ig.username.slice(0, 300) : null,
+  }
+}
+
+/**
+ * Pages a person was given access to through a Business Portfolio (not a direct Page role) are
+ * not listed by /me/accounts. Facebook Login for Business records exactly which Pages the person
+ * ticked as "granular scopes" on the token, which debug_token returns. The app secret travels in
+ * an Authorization header, never in the URL.
+ */
+async function listGrantedPages(userToken: string, fetchImpl: FetchLike): Promise<MetaPage[]> {
+  const { appId, appSecret } = getMetaOAuthConfig()
+  const dbg = await graphCall(
+    'GET', `${graph('/debug_token')}?${new URLSearchParams({ input_token: userToken }).toString()}`, null, fetchImpl,
+    { Authorization: `Bearer ${appId}|${appSecret}` },
+  )
+  const data = (dbg.data ?? {}) as { granular_scopes?: unknown }
+  const ids = new Set<string>()
+  for (const g of Array.isArray(data.granular_scopes) ? data.granular_scopes : []) {
+    const gs = g as { scope?: unknown; target_ids?: unknown }
+    if (gs.scope !== 'pages_show_list' && gs.scope !== 'pages_manage_posts') continue
+    for (const id of Array.isArray(gs.target_ids) ? gs.target_ids : []) if (typeof id === 'string' && /^[0-9]{1,32}$/.test(id)) ids.add(id)
+  }
+  const out: MetaPage[] = []
+  for (const id of [...ids].slice(0, 25)) {
+    try {
+      const page = toMetaPage(await metaGraphGet(`/${id}`, { fields: PAGE_FIELDS, access_token: userToken }, fetchImpl))
+      if (page) out.push(page)
+    } catch { /* one unreadable Page does not hide the others */ }
+  }
+  return out
+}
+
 /** The Pages this person manages, each with the Instagram professional account linked to it, if any. */
 export async function listMetaPages(userToken: string, fetchImpl: FetchLike = fetch): Promise<MetaPage[]> {
   const out: MetaPage[] = []
   let after: string | null = null
   for (let i = 0; i < 5; i++) {
-    const q: Record<string, string> = {
-      fields: 'id,name,access_token,instagram_business_account{id,username}', limit: '50', access_token: userToken,
-    }
+    const q: Record<string, string> = { fields: PAGE_FIELDS, limit: '50', access_token: userToken }
     if (after) q.after = after
     const json = await metaGraphGet('/me/accounts', q, fetchImpl)
     for (const row of Array.isArray(json.data) ? json.data : []) {
-      const r = row as { id?: unknown; name?: unknown; access_token?: unknown; instagram_business_account?: { id?: unknown; username?: unknown } }
-      if (typeof r.id !== 'string' || !/^[0-9]{1,32}$/.test(r.id) || typeof r.access_token !== 'string' || !r.access_token) continue
-      const ig = r.instagram_business_account
-      const igId = ig && typeof ig.id === 'string' && /^[0-9]{1,32}$/.test(ig.id) ? ig.id : null
-      out.push({
-        pageId: r.id,
-        name: typeof r.name === 'string' && r.name ? r.name.slice(0, 300) : r.id,
-        accessToken: r.access_token,
-        igUserId: igId,
-        igUsername: igId && typeof ig?.username === 'string' ? ig.username.slice(0, 300) : null,
-      })
+      const page = toMetaPage(row)
+      if (page) out.push(page)
     }
     const paging = json.paging as { cursors?: { after?: unknown }; next?: unknown } | undefined
     after = paging?.next && typeof paging.cursors?.after === 'string' ? paging.cursors.after : null
     if (!after) break
+  }
+  if (out.length === 0) {
+    try { return await listGrantedPages(userToken, fetchImpl) } catch { return out }
   }
   return out
 }
