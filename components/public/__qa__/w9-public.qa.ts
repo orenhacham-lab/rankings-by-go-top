@@ -59,7 +59,7 @@ function main() {
     const landing = strip(read('components/public/LandingPage.tsx'))
     const form = strip(read('components/free-check/FreeCheckHeroForm.tsx'))
     const badgeOk = (m: string, l: string) => /prominent \? 'min-h-10[^']*text-copy font-bold sm:h-11[^']*sm:text-lead'/.test(m)
-      && /border-contrast-ink bg-contrast-ink text-contrast/.test(m) && /<Eyebrow icon=\{Sparkles\} inverse prominent>\{copy\.hero\.eyebrow\}/.test(l)
+      && /border-contrast-ink bg-contrast-ink text-contrast/.test(m) && /<Eyebrow icon=\{Sparkles\} inverse prominent>\{(?:copy\.hero|heroWords)\.eyebrow\}/.test(l)
     check('A2: the hero badge is a prominent solid pill (bigger, light on navy, bold)', badgeOk(marketing, landing))
     check('MUT: the small translucent badge back fails A2', !badgeOk(marketing, landing.replace('inverse prominent>', 'inverse>')))
     // A3 was the other way round until w11: a lit, ring-2, 64px check field held the
