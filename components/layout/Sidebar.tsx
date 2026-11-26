@@ -11,6 +11,7 @@ import GoTopMark from '@/components/brand/GoTopMark'
 import WhatsAppGlyph from '@/components/brand/WhatsAppGlyph'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
+import { metaPostsText } from '@/lib/i18n/meta-posts'
 import { useActiveProject } from '@/lib/active-project/ActiveProjectProvider'
 import { useWaiting } from '@/components/nudges/useWaiting'
 import { pillText, railCounts } from '@/lib/nudges/rows'
@@ -39,6 +40,7 @@ import {
   X,
   Waypoints,
   MapPinned,
+  Share2,
 } from 'lucide-react'
 import {
   CONTENT_ROOT_PATH,
@@ -61,8 +63,10 @@ type NavItem = {
   icon: LucideIcon
   onboarding?: string
 } & (
-  | { labelKey: SidebarLabelKey; screenKey?: never }
-  | { screenKey: ContentScreenKey; labelKey?: never }
+  | { labelKey: SidebarLabelKey; screenKey?: never; metaLabel?: never }
+  | { screenKey: ContentScreenKey; labelKey?: never; metaLabel?: never }
+  /** Facebook/Instagram posts: its words live in lib/i18n/meta-posts.ts. */
+  | { metaLabel: true; labelKey?: never; screenKey?: never }
 )
 
 type NavGroup = {
@@ -144,6 +148,12 @@ const mapsPostsNavItems: readonly NavItem[] =
     ? [{ href: '/maps-posts', labelKey: 'mapsPosts', icon: MapPinned }]
     : []
 
+/** Posts on Facebook and Instagram (lib/meta-posts), behind the build-time mirror of META_POSTS_ENABLED. */
+const socialPostsNavItems: readonly NavItem[] =
+  process.env.NEXT_PUBLIC_META_POSTS_ENABLED === 'true'
+    ? [{ href: '/social-posts', metaLabel: true, icon: Share2 }]
+    : []
+
 const navGroupKeys: readonly NavGroup[] = [
   {
     groupKey: 'groupMain',
@@ -159,6 +169,7 @@ const navGroupKeys: readonly NavGroup[] = [
       ...contentNavItems,
       { href: '/site-links', labelKey: 'siteLinks', icon: Waypoints },
       ...mapsPostsNavItems,
+      ...socialPostsNavItems,
     ],
   },
   {
@@ -218,7 +229,8 @@ export function activeNavHref(pathname: string, items: readonly NavItem[]): stri
   return best
 }
 
-function navLabel(dict: ReturnType<typeof getDashboardDictionary>, item: NavItem): string {
+function navLabel(dict: ReturnType<typeof getDashboardDictionary>, item: NavItem, uiLocale: PublicLocale): string {
+  if (item.metaLabel) return metaPostsText(uiLocale).navLabel
   if (item.screenKey) return dict.contentHub.screens[item.screenKey]
   return dict.sidebar[item.labelKey]
 }
@@ -278,8 +290,9 @@ function NavLink({ item, isActive, label, count = 0, countLabel }: { item: NavIt
 }
 
 /** The groups under their headings: the same list for the rail and the drawer. */
-function NavGroups({ dict, activeHref, isAdmin, counts }: {
+function NavGroups({ dict, uiLocale, activeHref, isAdmin, counts }: {
   dict: ReturnType<typeof getDashboardDictionary>
+  uiLocale: PublicLocale
   activeHref: string | null
   isAdmin: boolean
   /** How many things wait on each entry's screen, by href; absent or 0 draws nothing. */
@@ -300,7 +313,7 @@ function NavGroups({ dict, activeHref, isAdmin, counts }: {
             <ul className="space-y-0.5">
               {group.items.map((item) => (
                 <li key={item.href}>
-                  <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item)} count={counts[item.href] ?? 0} countLabel={dict.railWaiting.aria(counts[item.href] ?? 0)} />
+                  <NavLink item={item} isActive={item.href === activeHref} label={navLabel(dict, item, uiLocale)} count={counts[item.href] ?? 0} countLabel={dict.railWaiting.aria(counts[item.href] ?? 0)} />
                 </li>
               ))}
             </ul>
@@ -557,7 +570,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
               </div>
               <nav aria-label={dict.sidebar.navLabel} className="flex-1 overflow-y-auto px-3 py-4">
                 <div className="space-y-5">
-                  <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} counts={counts} />
+                  <NavGroups dict={dict} uiLocale={uiLocale} activeHref={activeHref} isAdmin={isAdmin} counts={counts} />
                 </div>
               </nav>
               <div className="shrink-0 border-t border-rail-line px-3 py-3">
@@ -578,7 +591,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
               {/* A lit edge on the pill's start side, so the active entry reads at a glance. */}
               <span className="absolute inset-y-2 start-0 w-[3px] rounded-pill bg-rail-tagline" />
             </span>
-            <NavGroups dict={dict} activeHref={activeHref} isAdmin={isAdmin} counts={counts} />
+            <NavGroups dict={dict} uiLocale={uiLocale} activeHref={activeHref} isAdmin={isAdmin} counts={counts} />
           </div>
         </nav>
 

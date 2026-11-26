@@ -114,6 +114,7 @@ import { runIsolatedSeoBackfillSample } from '@/lib/content/seo-backfill-isolate
 import { runMapUpkeep, liveEnsure } from '@/lib/content/existing-content/map-upkeep'
 import { runBlogDailyWindow, startIsolatedBlogWindow } from '@/lib/blog/auto/daily-window'
 import { runIsolatedGbpDue } from '@/lib/gbp/due-isolated'
+import { runIsolatedMetaDue } from '@/lib/meta-posts/due-isolated'
 import { runIsolatedArticleBatch } from '@/lib/content/batch/isolated'
 import { runIsolatedInlineImageBatch } from '@/lib/content/image-batch/isolated'
 import { runLinkHeal, startIsolatedLinkHeal } from '@/lib/content/auto-internal-links/heal'
@@ -205,6 +206,8 @@ async function handle(request: Request): Promise<Response> {
     // morning. It rides this cron for the frequency, never the publish path itself, which
     // is forbidden to call Google at all. Production only, isolated: it never throws.
     await runIsolatedGbpDue()
+    // Approved Facebook/Instagram posts whose time has come (lib/meta-posts). Same rules: production only, flag-gated, never throws.
+    await runIsolatedMetaDue()
     // Then the automatic internal links of articles ALREADY PUBLISHED
     // (lib/content/auto-internal-links/heal.ts): their targets are asked again, a page
     // that has since been taken down loses its <a> (the words stay), and the live post

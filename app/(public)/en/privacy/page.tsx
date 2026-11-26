@@ -263,6 +263,56 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>Facebook and Instagram Posts (Go Top SEO Publisher)</h2>
+        <p>
+          If you choose to connect Facebook, Go Top SEO uses an app registered with Meta under the name{' '}
+          <strong>Go Top SEO Publisher</strong> so that you can publish posts to your Facebook Page and to the
+          Instagram professional account linked to it. The connection is yours to make and to remove. Facebook and
+          Instagram are trademarks of Meta Platforms, Inc.; this service is not made, approved or endorsed by Meta.
+        </p>
+        <ul>
+          <li><strong>Permissions we request:</strong> pages_show_list, pages_read_engagement, pages_manage_posts,
+          instagram_basic and instagram_content_publish. We ask for no other permission.</li>
+          <li><strong>What we read:</strong> your Facebook user identifier, the Pages you manage (name and
+          identifier) and the Instagram professional account linked to a Page (identifier and username). We do not
+          read your personal profile, friends, messages, followers or comments.</li>
+          <li><strong>What we store:</strong> your Facebook user identifier; the access tokens Facebook gives us,
+          <strong> encrypted with AES-256-GCM before they are stored</strong> and decrypted only on our servers at
+          the moment of use; the Page you choose for a project (identifier, name and the linked Instagram
+          identifier and username); and each post: its text, link, the address of its photo, the time you chose,
+          the time you approved it, its status, and the identifier and link Facebook or Instagram returned.</li>
+          <li><strong>What we do with it:</strong> <strong>we publish a post only after you approved it.</strong> You
+          see the exact text, press approve, and we publish it at once or at the time you chose. This connection
+          has no automatic posting: nothing is published that you did not read and approve. We do not change your
+          Page&rsquo;s settings and we do not delete anything on Facebook or Instagram.</li>
+          <li><strong>AI drafts:</strong> if you ask for a draft, only the title and summary of the article you chose
+          (or the topic you wrote) and the language are sent to the AI provider named in &ldquo;AI Providers&rdquo;
+          below. The details of your Page (its name, picture, identifier and tokens) are never sent to an AI
+          provider. A draft is not published until you approve it.</li>
+          <li><strong>Who receives this data:</strong> the data from this connection is not shared with Google or
+          anyone else, we do not sell it, and we do not use it for advertising. The only recipient of what we send
+          is Meta, to publish what you approved.</li>
+          <li><strong>Meta as a controller:</strong> what is held at Meta (your Page, its posts and followers) is
+          processed by Meta under its own policy, and Meta decides how. For this connection we are not joint
+          controllers with Meta; the joint arrangement described in &ldquo;Meta Advertising&rdquo; below covers only
+          the pixel and the Conversions API.</li>
+          <li><strong>Disconnecting:</strong> &ldquo;Disconnect&rdquo; in the app asks Meta to remove our
+          permissions and immediately deletes the stored tokens and the saved Page. Your post history stays in the
+          app until you ask us to delete it, and published posts stay on Facebook and Instagram until you remove
+          them there.</li>
+          <li><strong>Removing the app at Facebook:</strong> when you remove Go Top SEO Publisher in your Facebook
+          settings, Meta notifies us and we delete the stored tokens and the saved Page. If you also ask Facebook to
+          delete your data, Meta sends us a data deletion request, and we then delete automatically, within 30
+          days and usually at once, the connection, the saved Pages and every post record (drafts, scheduled and
+          published). You receive a confirmation code and can check it on the{' '}
+          <a href="/en/data-deletion">data deletion page</a>.</li>
+          <li><strong>Asking us directly:</strong> email <a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a>{' '}
+          from the email address of your Go Top SEO account. We confirm that the request comes from that address,
+          and delete within 30 days.</li>
+        </ul>
+      </section>
+
+      <section>
         <h2>Site Scanning (Free Check and Onboarding Scan)</h2>
         <p>
           In the free site check, which you can run before signing up, and in the onboarding scan after a project
