@@ -61,7 +61,7 @@ export const landingPl: LandingCopy = {
     checkLead: 'Nie mają Państwo jeszcze konta? Bezpłatna analiza witryny, bez rejestracji:',
     dashboard: 'Mój panel',
     trust: ['Publikuje na WordPressie, w Shopify i w Wixie', 'Wsparcie prawdziwych ludzi'],
-    climbChip: 'Pozycja 3 w Google',
+    climbChip: 'Rośnie w Google',
     published: 'Artykuł opublikowany na Państwa witrynie',
   },
   demo: {
@@ -69,7 +69,7 @@ export const landingPl: LandingCopy = {
     caption: 'Demo produktu. Nazwy firm i liczby są przykładowe.',
     tabs: ['Wzrost w Google', 'Nowy artykuł', 'Polecane przez AI'],
     describe: [
-      'Widok słów kluczowych: jedna fraza z pozycji 18 na pozycję 3 w Google i trzy inne, które rosną.',
+      'Widok słów kluczowych: frazy, które wzrosły w Google, ze zmianą obok każdej.',
       'Widok artykułów: nowy artykuł jest pisany, przechodzi kontrolę jakości i czeka na zaplanowaną publikację na witrynie.',
       'Widok widoczności w odpowiedziach AI: odpowiedź ChatGPT polecająca tę firmę oraz silniki, które ją wymieniają.',
     ],

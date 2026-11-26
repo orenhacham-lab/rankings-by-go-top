@@ -48,7 +48,7 @@ export const landingDe: LandingCopy = {
     checkLead: 'Noch kein Konto? Kostenlose Website-Analyse, ohne Anmeldung:',
     dashboard: 'Mein Dashboard',
     trust: ['Veröffentlicht auf WordPress, Shopify und Wix', 'Support von echten Menschen'],
-    climbChip: 'Position 3 in Google',
+    climbChip: 'Im Aufwärtstrend in Google',
     published: 'Artikel auf Ihrer Website veröffentlicht',
   },
   demo: {
@@ -56,7 +56,7 @@ export const landingDe: LandingCopy = {
     caption: 'Produktdemo. Firmennamen und Zahlen sind Beispiele.',
     tabs: ['Der Aufstieg in Google', 'Ein neuer Artikel', 'Von der KI empfohlen'],
     describe: [
-      'Die Keyword-Ansicht: ein Suchbegriff von Position 18 auf Position 3 in Google, und drei weitere im Aufwärtstrend.',
+      'Die Keyword-Ansicht: Suchbegriffe, die in Google aufgestiegen sind, mit der Veränderung daneben.',
       'Die Artikel-Ansicht: ein neuer Artikel wird geschrieben, besteht die Qualitätsprüfung und wartet auf die geplante Veröffentlichung auf der Website.',
       'Die Ansicht zur Sichtbarkeit in KI-Antworten: eine ChatGPT-Antwort, die das Unternehmen empfiehlt, und die Engines, die es nennen.',
     ],

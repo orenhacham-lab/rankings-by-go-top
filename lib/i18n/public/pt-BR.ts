@@ -30,7 +30,7 @@ export const ptBR = {
     featuresMenu: {
       contentPublishing: {
         label: 'Criação, agendamento e publicação de conteúdo',
-        description: 'Crie, agende e publique conteúdo de SEO e GEO dentro da própria plataforma, ao lado do acompanhamento de posições e de visibilidade.',
+        description: 'Crie, agende e publique artigos dentro da própria plataforma, ao lado do acompanhamento de posições e de visibilidade.',
       },
       googleOrganic: {
         label: 'Acompanhamento de posições no Google',
@@ -45,7 +45,7 @@ export const ptBR = {
         description: 'Descubra se a IA menciona o seu negócio nas respostas do ChatGPT, Gemini, Perplexity e Google AI.',
       },
       reports: {
-        label: 'Relatórios de SEO e GEO',
+        label: 'Relatórios de posições e IA',
         description: 'Gere relatórios profissionais em PDF e Excel para seus clientes, com posições, tendências e dados de visibilidade.',
       },
       keywordResearch: {

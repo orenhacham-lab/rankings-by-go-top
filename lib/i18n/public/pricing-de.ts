@@ -98,6 +98,13 @@ export const pricingDe: PricingCopy = {
         desc: 'Es antworten echte Menschen, über WhatsApp und per E-Mail.',
       },
     ],
+    notIncluded: {
+      title: 'Was nicht enthalten ist',
+      items: [
+        'Die Verwaltung bezahlter Anzeigen. Die Tarife umfassen Inhalte, Tracking und Berichte, keine Werbekampagnen.',
+        'Die Kontrolle über Ihre Platzierung. Die entscheiden Google und die KI-Dienste, nicht wir. Wir veröffentlichen, messen und zeigen Ihnen das Ergebnis.',
+      ],
+    },
   },
   value: {
     eyebrow: 'Warum es sich lohnt',

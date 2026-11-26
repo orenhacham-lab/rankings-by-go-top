@@ -105,6 +105,13 @@ export const pricingPl: PricingCopy = {
         desc: 'Odpowiadają prawdziwi ludzie, przez WhatsApp i e-mailem.',
       },
     ],
+    notIncluded: {
+      title: 'Czego nie obejmuje',
+      items: [
+        'Prowadzenie płatnych reklam. Plany obejmują treści, monitoring i raporty, a nie kampanie reklamowe.',
+        'Kontrola nad miejscem w wynikach. O tym decydują Google i silniki AI, a nie my. Publikujemy, mierzymy i pokazujemy wynik.',
+      ],
+    },
   },
   value: {
     eyebrow: 'Dlaczego to się opłaca',

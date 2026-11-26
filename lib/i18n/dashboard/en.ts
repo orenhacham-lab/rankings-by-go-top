@@ -14,10 +14,10 @@ export const dashboardEn = {
     clients: 'Clients',
     projects: 'Projects',
     keywords: 'Keywords',
-    keywordResearch: 'Keyword Research',
+    keywordResearch: 'What customers search',
     siteLinks: 'Links',
     mapsPosts: 'Posts on Google Maps',
-    aiVisibility: 'AI Visibility',
+    aiVisibility: 'ChatGPT & AI',
     projectSettings: 'Project settings',
     reports: 'Reports',
     siteHealth: 'Site health',
@@ -6437,7 +6437,7 @@ export const dashboardEn = {
     connect: {
       overline: 'Step 1',
       title: 'Connect your Google business profile',
-      body: 'We ask Google for one permission: to manage your business profile. We only publish posts you approve, and never change your hours, address or other details.',
+      body: 'We ask Google for one permission: to manage your business profile. Your Google password never reaches us. We only publish posts you approve (or each new article, if you switch on automatic posting), and never change your hours, address or other details.',
       points: [
         'This connection is separate from Search Console and you can disconnect at any time.',
         'The permission is stored encrypted.',

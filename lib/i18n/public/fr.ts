@@ -32,7 +32,7 @@ export const fr = {
     featuresMenu: {
       contentPublishing: {
         label: 'Rédaction, programmation et publication de contenu',
-        description: 'Rédigez, programmez et publiez votre contenu SEO et GEO directement depuis la plateforme, à côté du suivi de position et de visibilité.',
+        description: 'Rédigez, programmez et publiez vos articles directement depuis la plateforme, à côté du suivi de position et de visibilité.',
       },
       googleOrganic: {
         label: 'Suivi de position dans Google',
@@ -47,7 +47,7 @@ export const fr = {
         description: 'Découvrez si votre entreprise est citée dans les réponses de ChatGPT, Gemini, Perplexity et Google AI.',
       },
       reports: {
-        label: 'Rapports SEO et GEO',
+        label: 'Rapports de positions et d’IA',
         description: 'Générez des rapports professionnels en PDF et en Excel pour vos clients, avec les positions, les tendances et les données de visibilité.',
       },
       keywordResearch: {

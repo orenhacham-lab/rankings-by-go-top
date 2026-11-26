@@ -17,7 +17,7 @@ export const he = {
     featuresMenu: {
       contentPublishing: {
         label: 'יצירה, תזמון ופרסום תוכן',
-        description: 'צרו, תזמנו ופרסמו תוכן SEO ו-GEO ישירות מהמערכת, לצד מעקב הדירוגים והנראות שלכם.',
+        description: 'צרו, תזמנו ופרסמו מאמרים ישירות מהמערכת, לצד מעקב הדירוגים והנראות שלכם.',
       },
       googleOrganic: {
         label: 'בדיקת מיקום בגוגל חיפוש',
@@ -32,7 +32,7 @@ export const he = {
         description: 'גלו האם העסק שלכם מוזכר בתשובות ChatGPT, Gemini, Perplexity ו-Google AI.',
       },
       reports: {
-        label: 'הפקת דוחות SEO/GEO',
+        label: 'הפקת דוחות דירוג ו-AI',
         description: 'הפיקו דוחות PDF ו-Excel ללקוחות עם מיקומים, מגמות ונראות.',
       },
       keywordResearch: {

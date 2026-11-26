@@ -27,7 +27,7 @@ export const landingEn: LandingCopy = {
     checkLead: 'Not ready to sign up? Get a free site check, no signup:',
     dashboard: 'Go to my dashboard',
     trust: ['Publishes to WordPress, Shopify and Wix', 'Support from real people'],
-    climbChip: '#3 on Google',
+    climbChip: 'Moving up in Google',
     published: 'Article published on your site',
   },
   demo: {
@@ -35,7 +35,7 @@ export const landingEn: LandingCopy = {
     caption: 'Product demo. Business names and figures are illustrative.',
     tabs: ['Climbing in Google', 'A new article', 'Recommended by AI'],
     describe: [
-      'The keywords screen: a phrase that climbed from position 18 to 3 in Google, and three more on the way up.',
+      'The keywords screen: phrases that moved up in Google, with the change next to each one.',
       'The articles screen: a new article is written, passes the quality check and is scheduled to publish on the site.',
       'The AI visibility screen: a ChatGPT answer that recommends the business, and the engines that mention it.',
     ],

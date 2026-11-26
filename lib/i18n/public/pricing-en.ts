@@ -84,6 +84,13 @@ export const pricingEn: PricingCopy = {
         desc: 'Real people answer you, on WhatsApp and by email.',
       },
     ],
+    notIncluded: {
+      title: 'What is not included',
+      items: [
+        'Managing paid ads. The plans cover content, tracking and reports, not ad campaigns.',
+        'Control over where you appear. Google and the AI engines decide that, not us. We publish and measure, and show you the result.',
+      ],
+    },
   },
   value: {
     eyebrow: 'Why it pays',

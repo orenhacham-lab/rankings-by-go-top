@@ -316,7 +316,7 @@ export const aiVisibilityPl: DeepPartial<DashboardDictionary> = {
     connect: {
       overline: 'Krok 1',
       title: 'Prosimy połączyć Profil Firmy w Google',
-      body: 'Od Google prosimy o jedno uprawnienie: zarządzanie profilem firmy. Publikujemy tylko to, co zostało zatwierdzone, i nigdy nie zmieniamy godzin otwarcia, adresu ani innych danych.',
+      body: 'Od Google prosimy o jedno uprawnienie: zarządzanie profilem firmy. Hasło do Google nigdy do nas nie trafia. Publikujemy tylko to, co zostało zatwierdzone (albo każdy nowy artykuł, jeśli włączone jest automatyczne publikowanie), i nigdy nie zmieniamy godzin otwarcia, adresu ani innych danych.',
       points: [
         'To połączenie jest niezależne od Search Console i można je zawsze odwołać.',
         'Uprawnienie zapisujemy zaszyfrowane.',

@@ -40,7 +40,7 @@ export const de = {
     featuresMenu: {
       contentPublishing: {
         label: 'Inhalte schreiben, planen und veröffentlichen',
-        description: 'SEO- und GEO-Inhalte direkt aus der Plattform schreiben, planen und veröffentlichen, neben dem Tracking von Positionen und Sichtbarkeit.',
+        description: 'Artikel direkt aus der Plattform schreiben, planen und veröffentlichen, neben dem Tracking von Positionen und Sichtbarkeit.',
       },
       googleOrganic: {
         label: 'Google-Rankings verfolgen',
@@ -55,7 +55,7 @@ export const de = {
         description: 'Herausfinden, ob Ihr Unternehmen in den Antworten von ChatGPT, Gemini, Perplexity und Google AI genannt wird.',
       },
       reports: {
-        label: 'SEO- und GEO-Berichte',
+        label: 'Berichte zu Positionen und KI',
         description: 'Berichte in PDF und Excel für Ihre Kunden, mit Positionen, Entwicklungen und Sichtbarkeitsdaten.',
       },
       keywordResearch: {

@@ -110,6 +110,13 @@ export const pricingKo: PricingCopy = {
         desc: 'WhatsApp과 이메일로 실제 사람이 답합니다.',
       },
     ],
+    notIncluded: {
+      title: '포함되지 않는 것',
+      items: [
+        '유료 광고 운영. 요금제에는 콘텐츠, 순위 추적, 리포트가 포함되며 광고 캠페인 운영은 포함되지 않습니다.',
+        '노출 순위 결정. 순위는 Google과 AI 엔진이 정하며 저희가 정하는 것이 아닙니다. 저희는 글을 발행하고 결과를 측정해 보여 드립니다.',
+      ],
+    },
   },
   value: {
     eyebrow: '왜 이득인가',

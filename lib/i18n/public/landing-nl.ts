@@ -52,7 +52,7 @@ export const landingNl: LandingCopy = {
     checkLead: 'Nog geen account? Gratis websiteanalyse, zonder registratie:',
     dashboard: 'Mijn dashboard',
     trust: ['Publiceert op WordPress, Shopify en Wix', 'Ondersteuning door echte mensen'],
-    climbChip: 'Positie 3 in Google',
+    climbChip: 'Stijgend in Google',
     published: 'Artikel gepubliceerd op uw website',
   },
   demo: {
@@ -60,7 +60,7 @@ export const landingNl: LandingCopy = {
     caption: 'Productdemo. Bedrijfsnamen en cijfers zijn voorbeelden.',
     tabs: ['De stijging in Google', 'Een nieuw artikel', 'Aanbevolen door de AI'],
     describe: [
-      'Het zoekwoordenoverzicht: één zoekterm van positie 18 naar positie 3 in Google, en drie andere die stijgen.',
+      'Het zoekwoordenoverzicht: zoektermen die in Google stegen, met de verandering naast elk.',
       'Het artikeloverzicht: een nieuw artikel wordt geschreven, komt door de kwaliteitscontrole en wacht op de geplande publicatie op de website.',
       'Het overzicht van de zichtbaarheid in AI-antwoorden: een antwoord van ChatGPT dat het bedrijf aanbeveelt, en de engines die het noemen.',
     ],

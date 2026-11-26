@@ -36,10 +36,10 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     clients: 'Clientes',
     projects: 'Webs',
     keywords: 'Palabras clave',
-    keywordResearch: 'Buscar palabras clave',
+    keywordResearch: 'Qué buscan tus clientes',
     siteLinks: 'Enlaces',
     mapsPosts: 'Publicaciones en Google Maps',
-    aiVisibility: 'Visibilidad en IA',
+    aiVisibility: 'ChatGPT e IA',
     projectSettings: 'Ajustes de la web',
     reports: 'Informes',
     siteHealth: 'Salud de la web',
@@ -6080,7 +6080,7 @@ export const dashboardEs: DeepPartial<DashboardDictionary> = {
     connect: {
       overline: 'Paso 1',
       title: 'Conecta tu perfil de empresa en Google',
-      body: 'Le pedimos a Google un solo permiso: gestionar tu perfil de empresa. Solo publicamos lo que tú apruebas y nunca cambiamos tu horario, tu dirección ni otros datos.',
+      body: 'Le pedimos a Google un solo permiso: gestionar tu perfil de empresa. Tu contraseña de Google nunca llega a nosotros. Solo publicamos lo que tú apruebas (o cada artículo nuevo, si activas la publicación automática) y nunca cambiamos tu horario, tu dirección ni otros datos.',
       points: [
         'Esta conexión es independiente de Search Console y puedes desconectarla cuando quieras.',
         'El permiso se guarda cifrado.',

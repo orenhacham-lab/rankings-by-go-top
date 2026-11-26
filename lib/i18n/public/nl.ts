@@ -49,7 +49,7 @@ export const nl = {
     featuresMenu: {
       contentPublishing: {
         label: 'Content schrijven, plannen en publiceren',
-        description: 'SEO- en GEO-content rechtstreeks vanuit het platform schrijven, plannen en publiceren, naast het meten van posities en zichtbaarheid.',
+        description: 'Artikelen rechtstreeks vanuit het platform schrijven, plannen en publiceren, naast het meten van posities en zichtbaarheid.',
       },
       googleOrganic: {
         label: 'Google-posities volgen',
@@ -64,7 +64,7 @@ export const nl = {
         description: 'Ontdekken of uw bedrijf genoemd wordt in de antwoorden van ChatGPT, Gemini, Perplexity en Google AI.',
       },
       reports: {
-        label: 'SEO- en GEO-rapporten',
+        label: 'Rapporten over posities en AI',
         description: 'Rapporten in pdf en Excel voor uw klanten, met posities, ontwikkelingen en zichtbaarheidsdata.',
       },
       keywordResearch: {

@@ -59,7 +59,7 @@ export const landingKo: LandingCopy = {
     checkLead: '계정을 만들기엔 이르다고 느끼신다면, 가입 없이 사이트를 무료로 진단해 드립니다:',
     dashboard: '대시보드',
     trust: ['WordPress, Shopify, Wix에 발행', '담당자가 직접 돕는 지원'],
-    climbChip: 'Google 3위',
+    climbChip: 'Google에서 상승 중',
     published: '글을 사이트에 발행했습니다',
   },
   demo: {
@@ -67,7 +67,7 @@ export const landingKo: LandingCopy = {
     caption: '제품 데모입니다. 업체명과 수치는 예로 든 것입니다.',
     tabs: ['Google 순위 상승', '새 글', 'AI가 추천'],
     describe: [
-      '키워드 화면입니다. 어떤 검색어가 Google 18위에서 3위로 올라갔고, 다른 세 개도 올라갔습니다.',
+      '키워드 화면입니다. Google에서 순위가 오른 검색어와 각각의 변화가 표시됩니다.',
       '글 화면입니다. 새 글이 작성되어 품질 검사를 통과하고 사이트 발행 예약을 기다리고 있습니다.',
       'AI 가시성 화면입니다. ChatGPT의 답변이 이 업체를 추천하고 있고, 인용한 엔진들이 함께 보입니다.',
     ],

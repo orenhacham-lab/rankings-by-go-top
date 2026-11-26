@@ -307,7 +307,7 @@ export const aiVisibilityJa: DeepPartial<DashboardDictionary> = {
     connect: {
       overline: 'ステップ1',
       title: 'Googleビジネスプロフィールを連携します',
-      body: 'Google に求める権限は、事業者情報の管理の1つだけです。承認いただいたものだけを投稿し、営業時間、住所、その他の情報を変更することはありません。',
+      body: 'Google に求める権限は、事業者情報の管理の1つだけです。Google のパスワードが当社に届くことはありません。承認いただいたもの（自動投稿をオンにした場合は新しい記事ごと）だけを投稿し、営業時間、住所、その他の情報を変更することはありません。',
       points: [
         'この連携は Search Console とは別で、いつでも取り消せます。',
         '権限は暗号化して保存します。',

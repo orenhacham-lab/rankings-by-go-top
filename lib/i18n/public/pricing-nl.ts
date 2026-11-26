@@ -98,6 +98,13 @@ export const pricingNl: PricingCopy = {
         desc: 'Er antwoorden echte mensen, via WhatsApp en per e-mail.',
       },
     ],
+    notIncluded: {
+      title: 'Wat niet is inbegrepen',
+      items: [
+        'Het beheren van betaalde advertenties. De abonnementen dekken content, metingen en rapporten, geen advertentiecampagnes.',
+        'Controle over uw plek in de resultaten. Die bepalen Google en de AI-diensten, niet wij. Wij publiceren, meten en laten u het resultaat zien.',
+      ],
+    },
   },
   value: {
     eyebrow: 'Waarom het de moeite waard is',

@@ -35,7 +35,7 @@ export const it = {
     featuresMenu: {
       contentPublishing: {
         label: 'Scrittura, programmazione e pubblicazione dei contenuti',
-        description: 'Scrittura, programmazione e pubblicazione dei contenuti SEO e GEO direttamente dalla piattaforma, accanto al monitoraggio delle posizioni e della visibilità.',
+        description: 'Scrittura, programmazione e pubblicazione degli articoli direttamente dalla piattaforma, accanto al monitoraggio delle posizioni e della visibilità.',
       },
       googleOrganic: {
         label: 'Monitoraggio delle posizioni in Google',
@@ -50,7 +50,7 @@ export const it = {
         description: 'Scoprire se l’azienda viene citata nelle risposte di ChatGPT, Gemini, Perplexity e Google AI.',
       },
       reports: {
-        label: 'Report SEO e GEO',
+        label: 'Report di posizioni e IA',
         description: 'Report professionali in PDF e in Excel da consegnare ai clienti, con posizioni, andamenti e dati di visibilità.',
       },
       keywordResearch: {

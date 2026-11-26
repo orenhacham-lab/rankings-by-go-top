@@ -166,7 +166,7 @@ async function main() {
       check(`C1 ${name}: names the "AI Visibility" screen and its card, not the project settings`, ok(src) && around.length > 0)
       check(`C1-MUT ${name}: the old "project settings" sentence is caught`, !ok(src.replace(phrase, name.startsWith('he') ? 'בהגדרות הפרויקט' : 'in the project settings')))
     }
-    check('C2: the card and the tab carry those names in the dictionary', he.aiVisibilityOverview.autoSettingLabel === 'בדיקה חודשית אוטומטית' && he.sidebar.aiVisibility === 'נראות ב-AI' && en.aiVisibilityOverview.autoSettingLabel === 'Automatic monthly check' && en.sidebar.aiVisibility === 'AI Visibility')
+    check('C2: the card and the tab carry those names in the dictionary', he.aiVisibilityOverview.autoSettingLabel === 'בדיקה חודשית אוטומטית' && he.sidebar.aiVisibility === 'ChatGPT ו-AI' && en.aiVisibilityOverview.autoSettingLabel === 'Automatic monthly check' && en.sidebar.aiVisibility === 'ChatGPT & AI')
   }
 
   // ── D. The ideas column ──────────────────────────────────────────────────

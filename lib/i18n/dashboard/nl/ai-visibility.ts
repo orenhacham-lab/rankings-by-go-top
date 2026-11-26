@@ -303,7 +303,7 @@ export const aiVisibilityNl: DeepPartial<DashboardDictionary> = {
     connect: {
       overline: 'Stap 1',
       title: 'Verbind het Google-bedrijfsprofiel',
-      body: 'Van Google vragen wij één recht: het bedrijfsprofiel beheren. We publiceren alleen wat is goedgekeurd, en we veranderen nooit de openingstijden, het adres of andere gegevens.',
+      body: 'Van Google vragen wij één recht: het bedrijfsprofiel beheren. Het Google-wachtwoord komt nooit bij ons terecht. We publiceren alleen wat is goedgekeurd (of elk nieuw artikel, als automatisch posten is aangezet), en we veranderen nooit de openingstijden, het adres of andere gegevens.',
       points: [
         'Deze verbinding staat los van Search Console en kan altijd worden ingetrokken.',
         'Het recht wordt versleuteld opgeslagen.',
