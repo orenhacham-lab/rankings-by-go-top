@@ -8,7 +8,7 @@ export const realImproveDeps: ImproveDeps = {
     const key = process.env.GEMINI_API_KEY?.trim()
     if (!key) return null
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 12_000)
+    const timer = setTimeout(() => controller.abort(), 22_000)
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL()}:generateContent`, {
         method: 'POST',
