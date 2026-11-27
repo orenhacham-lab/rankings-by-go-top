@@ -57,3 +57,27 @@ revoke all on function public.video_credit_spend(uuid, integer, uuid) from publi
 revoke all on function public.video_credit_refund(uuid, integer, uuid, numeric) from public, anon, authenticated;
 grant execute on function public.video_credit_spend(uuid, integer, uuid) to service_role;
 grant execute on function public.video_credit_refund(uuid, integer, uuid, numeric) to service_role;
+
+-- One row per clip request. Daily ceilings are counted from here; storage_path is
+-- set when the clip is stored and cleared when it expires (7 days).
+create table if not exists public.video_jobs (
+  id uuid primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  project_id uuid not null references public.projects(id) on delete cascade,
+  status text not null check (status in ('running', 'done', 'failed')),
+  seconds integer not null,
+  credits integer not null,
+  cost_usd numeric(8, 4),
+  storage_path text,
+  expires_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists video_jobs_user_day_idx on public.video_jobs (user_id, created_at desc);
+create index if not exists video_jobs_expiry_idx on public.video_jobs (expires_at) where storage_path is not null;
+alter table public.video_jobs enable row level security;
+drop policy if exists video_jobs_owner_read on public.video_jobs;
+create policy video_jobs_owner_read on public.video_jobs for select using (user_id = auth.uid());
+
+-- Private bucket: clips are served only through short-lived signed URLs.
+insert into storage.buckets (id, name, public) values ('video-studio', 'video-studio', false)
+  on conflict (id) do nothing;

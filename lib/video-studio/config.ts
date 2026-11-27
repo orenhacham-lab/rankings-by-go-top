@@ -22,3 +22,11 @@ export type AspectRatio = (typeof ASPECT_RATIOS)[number]
 export function isVideoStudioEnabled(): boolean {
   return process.env.VIDEO_STUDIO_ENABLED === 'true'
 }
+
+/** Ceilings, per request and per day. A request is refused before any money is spent. */
+export const MAX_CLIPS_PER_USER_PER_DAY = 10
+export const MAX_GLOBAL_COST_USD_PER_DAY = 25
+/** The request body travels through Vercel (4.5 MB cap), so photos are capped as base64 text. */
+export const MAX_IMAGES_BASE64_CHARS = 4_000_000
+export const VIDEO_BUCKET = 'video-studio'
+export const VIDEO_RETENTION_DAYS = 7

@@ -2,6 +2,8 @@
 create schema auth;
 create table auth.users (id uuid primary key);
 create function auth.uid() returns uuid language sql as $$ select null::uuid $$;
+create table public.projects (id uuid primary key);
+create schema storage; create table storage.buckets (id text primary key, name text, public boolean);
 create role anon; create role authenticated; create role service_role;
 \i supabase/migrations/20261127000000_video_studio_credits.sql
 
@@ -19,4 +21,6 @@ insert into r select 'anon cannot execute spend', not has_function_privilege('an
 insert into r select 'authenticated cannot execute spend', not has_function_privilege('authenticated', 'public.video_credit_spend(uuid,integer,uuid)', 'execute');
 insert into r select 'service_role can', has_function_privilege('service_role', 'public.video_credit_spend(uuid,integer,uuid)', 'execute');
 insert into r select 'negative balance is impossible (check constraint)', (select count(*) from pg_constraint where conrelid = 'public.video_credit_wallets'::regclass and contype = 'c') >= 1;
+insert into r select 'video_jobs exists with RLS on', (select relrowsecurity from pg_class where oid = 'public.video_jobs'::regclass);
+insert into r select 'bucket is private', (select not public from storage.buckets where id = 'video-studio');
 select case when count(*) filter (where not ok) = 0 then 'PROBE OK: ' || count(*) || ' checks' else 'FAIL: ' || string_agg(name, '; ') filter (where not ok) end from r;
