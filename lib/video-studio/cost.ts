@@ -6,10 +6,11 @@
  * $9 per 1M. That is 5,792 tokens per second of 720p video, about $0.07 a second,
  * the same as Google's published price.
  *
- * PRICE: prepaid credits, 1 credit = 1 shekel (about $0.30 abroad). A clip of up
- * to 6 s is 5 credits, and every further second is 1 credit. An edit of an existing
- * clip is priced as a new clip, because that is what it costs us. The floor is
- * three times our cost at every duration (checked by the QA suite).
+ * PRICE: prepaid credits, 1 credit = 1 shekel (about $0.30 abroad). A clip costs
+ * its seconds plus one credit. Oren asked (27.11) for 4 to 5 times our cost: that
+ * lands at 4.6x for 15 s, 5.0x for 5 s and 5.5x for 3 s (the QA suite holds the
+ * floor at 4x and the ceiling at 6x for every duration). An edit of an existing
+ * clip is priced as a new clip, because that is what it costs us.
  */
 import { MAX_SECONDS, MIN_SECONDS } from './config'
 
@@ -18,8 +19,7 @@ export const VIDEO_USD_PER_MILLION_TOKENS = 12
 /** Thinking tokens are small; a fixed allowance keeps the estimate on the safe side. */
 export const THINKING_ALLOWANCE_USD = 0.01
 export const USD_PER_CREDIT = 0.3
-export const BASE_CREDITS = 5
-export const BASE_SECONDS = 6
+export const EXTRA_CREDITS = 1
 
 export function isValidSeconds(s: unknown): s is number {
   return typeof s === 'number' && Number.isInteger(s) && s >= MIN_SECONDS && s <= MAX_SECONDS
@@ -39,5 +39,5 @@ export function actualCostUsd(usage: { videoTokens: number; thoughtTokens: numbe
 /** What the customer pays, in credits. */
 export function creditsFor(seconds: number): number {
   if (!isValidSeconds(seconds)) throw new Error('invalid_seconds')
-  return BASE_CREDITS + Math.max(0, seconds - BASE_SECONDS)
+  return seconds + EXTRA_CREDITS
 }

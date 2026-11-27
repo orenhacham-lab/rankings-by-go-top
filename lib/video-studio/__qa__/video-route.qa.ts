@@ -74,21 +74,21 @@ async function main() {
 
   // C) spend before model; refusal never calls the model
   { const { deps, log } = makeDeps(); const r = await run(deps, good)
-    ok(r.status === 200 && r.body.ok && r.body.credits === 5 && r.body.url === 'https://signed/x', 'C1 happy path')
+    ok(r.status === 200 && r.body.ok && r.body.credits === 6 && r.body.url === 'https://signed/x', 'C1 happy path')
     ok(log.calls.indexOf('spend') > -1 && log.calls.indexOf('spend') < log.calls.indexOf('model'), 'C2 credits taken before the model') }
-  { const { deps, log } = makeDeps({}, { balance: 4 }); const r = await run(deps, good)
+  { const { deps, log } = makeDeps({}, { balance: 5 }); const r = await run(deps, good)
     ok(r.status === 402 && r.body.error === 'insufficient_credits' && !log.calls.includes('model'), 'C3 too few credits: 402 and the model is NOT called') }
   { const { deps, log } = makeDeps({}, { balance: 100 }); const r = await run(deps, { ...good, seconds: 15 })
-    ok(r.body.credits === 14 && log.spent === 14, 'C4 15 s costs 14 credits') }
+    ok(r.body.credits === 16 && log.spent === 16, 'C4 15 s costs 16 credits') }
 
   // D) failures refund, with stable codes only
   for (const [code, st] of [['provider_failed', 502], ['no_video', 502]] as const) {
     const { deps, log, balance } = makeDeps({}, { model: { ok: false, error: code } }); const r = await run(deps, good)
-    ok(r.status === st && r.body.error === code && log.refunded === 5 && balance() === 100, `D1 ${code}: refunded in full`)
+    ok(r.status === st && r.body.error === code && log.refunded === 6 && balance() === 100, `D1 ${code}: refunded in full`)
     ok(JSON.stringify(r.body).length < 80, `D2 ${code}: body carries only the code`)
   }
   { const { deps, log, balance } = makeDeps({}, { store: null }); const r = await run(deps, good)
-    ok(r.status === 500 && log.refunded === 5 && balance() === 100, 'D3 storage failure refunds') }
+    ok(r.status === 500 && log.refunded === 6 && balance() === 100, 'D3 storage failure refunds') }
   { const { deps, balance } = makeDeps({ callModel: async () => { throw new Error('boom: secret provider text') } }); const r = await run(deps, good)
     ok(r.status === 500 && r.body.error === 'unexpected' && !JSON.stringify(r.body).includes('boom'), 'D4 thrown error: stable code only')
     void balance }

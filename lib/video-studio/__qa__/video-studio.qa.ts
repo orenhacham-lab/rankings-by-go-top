@@ -9,12 +9,12 @@ function check(name: string, ok: boolean, detail = '') {
 async function main() {
   // A. price vs cost
   const seconds = Array.from({ length: MAX_SECONDS - MIN_SECONDS + 1 }, (_, i) => i + MIN_SECONDS)
-  check('A1: the price is at least 3x our cost at every duration', seconds.every((s) => creditsFor(s) * USD_PER_CREDIT >= 3 * estimateCostUsd(s)),
-    seconds.filter((s) => creditsFor(s) * USD_PER_CREDIT < 3 * estimateCostUsd(s)).join(','))
-  check('A2: 5 s costs 5 credits, 6 s costs 5, 15 s costs 14', creditsFor(5) === 5 && creditsFor(6) === 5 && creditsFor(15) === 14)
+  check('A1: the price is 4x to 6x our cost at every duration', seconds.every((s) => { const m = creditsFor(s) * USD_PER_CREDIT / estimateCostUsd(s); return m >= 4 && m <= 6 }),
+    seconds.map((s) => `${s}s=${(creditsFor(s) * USD_PER_CREDIT / estimateCostUsd(s)).toFixed(2)}x`).join(' '))
+  check('A2: 5 s costs 6 credits, 6 s costs 7, 15 s costs 16', creditsFor(5) === 6 && creditsFor(6) === 7 && creditsFor(15) === 16)
   check('A3: the estimate matches the three measured clips (about 0.355 USD)', Math.abs(actualCostUsd({ videoTokens: 28960, thoughtTokens: 866, inputTokens: 32 }) - 0.3554) < 0.001)
   check('A4: out-of-range or fractional seconds throw', [2, 16, 5.5, NaN].every((s) => { try { creditsFor(s); return false } catch { return true } }))
-  check('A1-MUT: a flat 1 credit per clip would fail A1', !seconds.every((s) => 1 * USD_PER_CREDIT >= 3 * estimateCostUsd(s)))
+  check('A1-MUT: the old pricing (5 credits to 6 s) would fail the 4x floor', !seconds.every((s) => (5 + Math.max(0, s - 6)) * USD_PER_CREDIT / estimateCostUsd(s) >= 4))
 
   // B. the request is fixed where it must be
   const ok = buildRequest({ prompt: 'a bouquet', seconds: 5, aspect: '9:16', images: [{ data: 'x', mimeType: 'image/jpeg' }] })
