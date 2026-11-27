@@ -8,7 +8,7 @@ import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { VIDEO_STUDIO_COPY } from '@/lib/video-studio/copy'
 import { creditsFor } from '@/lib/video-studio/cost'
 import { CREDIT_PACKS, majorAmount, type PackId } from '@/lib/video-studio/packs'
-import { PAYPAL_LOCALE } from '@/lib/i18n/locales'
+import { LOCALE_PREFIX, PAYPAL_LOCALE } from '@/lib/i18n/locales'
 import { MAX_PROMPT_CHARS, MAX_REFERENCE_IMAGES, MAX_SECONDS, MIN_SECONDS } from '@/lib/video-studio/config'
 
 interface Photo { id: number; data: string; mimeType: 'image/jpeg'; preview: string }
@@ -110,16 +110,16 @@ function Credits({ onBalance, refreshKey }: { onBalance: (n: number) => void; re
       {(canBuy || provider === 'creem') && (
         <div className="space-y-2">
           <h2 className="text-sm font-medium">{t.buyTitle}</h2>
-          <label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5" />{t.ack}</label>
+          <label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5" />{t.ack}{' '}<a href={`${LOCALE_PREFIX[uiLocale]}/refund-policy`} target="_blank" rel="noopener" className="underline">{t.policyLink}</a></label>
           {ack && (Object.keys(CREDIT_PACKS) as PackId[]).map((id) => (
             <div key={id} className="space-y-1">
               {provider === 'creem' ? (
                 <button type="button" disabled={busy} onClick={() => void buyWithCreem(id)} className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50">
-                  {t.pack(CREDIT_PACKS[id].credits, `$${majorAmount(CREDIT_PACKS[id].amountMinor.USD)}`)}
+                  {t.pack(CREDIT_PACKS[id].credits, `$${majorAmount(CREDIT_PACKS[id].amountMinor.USD)} ${t.taxUsd}`)}
                 </button>
               ) : (
                 <>
-                  <p className="text-sm">{t.pack(CREDIT_PACKS[id].credits, `${majorAmount(CREDIT_PACKS[id].amountMinor.ILS)} ₪`)}</p>
+                  <p className="text-sm">{t.pack(CREDIT_PACKS[id].credits, `${majorAmount(CREDIT_PACKS[id].amountMinor.ILS)} ₪ ${t.vatIls}`)}</p>
                   <div ref={(el) => { slots.current[id] = el }} />
                 </>
               )}

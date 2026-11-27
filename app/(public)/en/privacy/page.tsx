@@ -601,6 +601,13 @@ export default function EnglishPrivacyPage() {
       </section>
 
       <section>
+        <h2>Video Studio</h2>
+        <p>
+          When you create a clip, the photos you upload and the description you write are sent to Google&apos;s video model (Gemini API) to produce it. We keep the photos and the finished clip in private storage that only your account can open, for up to 7 days, and then they are deleted. We keep the request ID, its length, its cost in credits and its outcome, so we can bill and refund credits. We do not use photos or clips for advertising and we do not sell them. Upload only photos you have the right to use. Do not upload photos of an identifiable person without their consent.
+        </p>
+      </section>
+
+      <section>
         <h2>AI Providers</h2>
         <p>Some features send data to the following AI services to produce the result you asked for:</p>
         <ul>

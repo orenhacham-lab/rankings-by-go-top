@@ -15,7 +15,7 @@ export interface VideoStudioCopy {
   resultTitle: string; download: string; keptFor: string
   errors: Record<'insufficient_credits' | 'daily_limit' | 'too_many_images' | 'images_too_large' | 'invalid_request' | 'failed', string>
   noPhotos: string
-  credits: { balance: (n: number) => string; buyTitle: string; pack: (credits: number, price: string) => string; ack: string; paid: (n: number) => string; payFailed: string }
+  credits: { balance: (n: number) => string; buyTitle: string; pack: (credits: number, price: string) => string; ack: string; paid: (n: number) => string; payFailed: string; vatIls: string; taxUsd: string; policyLink: string }
 }
 
 
@@ -37,6 +37,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `יתרה: ${n} קרדיטים`,
       buyTitle: 'קניית קרדיטים',
+      vatIls: 'כולל מע״מ', taxUsd: '+ מס', policyLink: 'מדיניות ההחזרים',
       pack: (c, p) => `${c} קרדיטים ב-${p}`,
       ack: 'אני מבין שקרדיטים ששימשו ליצירת קליפ לא מוחזרים, למעט מה שהחוק מחייב.',
       paid: (n) => `התשלום התקבל. נוספו ${n} קרדיטים.`,
@@ -60,6 +61,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `Balance: ${n} credits`,
       buyTitle: 'Buy credits',
+      vatIls: 'VAT included', taxUsd: '+ tax', policyLink: 'Refund policy',
       pack: (c, p) => `${c} credits for ${p}`,
       ack: 'I understand that credits used to make a clip are not refunded, except as the law requires.',
       paid: (n) => `Payment received. ${n} credits added.`,
@@ -83,6 +85,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `Saldo: ${n} créditos`,
       buyTitle: 'Comprar créditos',
+      vatIls: 'IVA incluido', taxUsd: '+ impuestos', policyLink: 'Política de reembolsos',
       pack: (c, p) => `${c} créditos por ${p}`,
       ack: 'Entiendo que los créditos usados para crear un clip no se reembolsan, salvo lo que exija la ley.',
       paid: (n) => `Pago recibido. Se añadieron ${n} créditos.`,
@@ -106,6 +109,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `Saldo: ${n} créditos`,
       buyTitle: 'Comprar créditos',
+      vatIls: 'impostos incluídos', taxUsd: '+ impostos', policyLink: 'Política de reembolso',
       pack: (c, p) => `${c} créditos por ${p}`,
       ack: 'Entendo que créditos usados para criar um clipe não são reembolsados, exceto quando a lei exigir.',
       paid: (n) => `Pagamento recebido. ${n} créditos adicionados.`,
@@ -129,6 +133,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `Solde : ${n} crédits`,
       buyTitle: 'Acheter des crédits',
+      vatIls: 'TVA incluse', taxUsd: '+ taxes', policyLink: 'Politique de remboursement',
       pack: (c, p) => `${c} crédits pour ${p}`,
       ack: 'Je comprends que les crédits utilisés pour créer un clip ne sont pas remboursés, sauf ce que la loi impose.',
       paid: (n) => `Paiement reçu. ${n} crédits ajoutés.`,
@@ -152,6 +157,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `Saldo: ${n} crediti`,
       buyTitle: 'Acquista crediti',
+      vatIls: 'IVA inclusa', taxUsd: '+ imposte', policyLink: 'Politica di rimborso',
       pack: (c, p) => `${c} crediti a ${p}`,
       ack: 'Capisco che i crediti usati per creare una clip non vengono rimborsati, salvo quanto previsto dalla legge.',
       paid: (n) => `Pagamento ricevuto. Aggiunti ${n} crediti.`,
@@ -175,6 +181,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `残高：${n}クレジット`,
       buyTitle: 'クレジットを購入',
+      vatIls: '税込', taxUsd: '＋税', policyLink: '返金ポリシー',
       pack: (c, p) => `${c}クレジット：${p}`,
       ack: 'クリップの作成に使用したクレジットは、法律で定められた場合を除き返金されないことを理解しました。',
       paid: (n) => `お支払いを確認しました。${n}クレジットを追加しました。`,
@@ -198,6 +205,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `Guthaben: ${n} Credits`,
       buyTitle: 'Credits kaufen',
+      vatIls: 'inkl. MwSt.', taxUsd: 'zzgl. Steuern', policyLink: 'Rückerstattungsrichtlinie',
       pack: (c, p) => `${c} Credits für ${p}`,
       ack: 'Ich verstehe, dass für einen Clip verbrauchte Credits nicht erstattet werden, außer wo das Gesetz es verlangt.',
       paid: (n) => `Zahlung erhalten. ${n} Credits hinzugefügt.`,
@@ -221,6 +229,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `Saldo: ${n} credits`,
       buyTitle: 'Credits kopen',
+      vatIls: 'incl. btw', taxUsd: '+ belasting', policyLink: 'Terugbetalingsbeleid',
       pack: (c, p) => `${c} credits voor ${p}`,
       ack: 'Ik begrijp dat credits die voor een clip zijn gebruikt niet worden terugbetaald, behalve waar de wet dat vereist.',
       paid: (n) => `Betaling ontvangen. ${n} credits toegevoegd.`,
@@ -244,6 +253,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `Saldo: ${n} kredytów`,
       buyTitle: 'Kup kredyty',
+      vatIls: 'z VAT', taxUsd: '+ podatek', policyLink: 'Zasady zwrotów',
       pack: (c, p) => `${c} kredytów za ${p}`,
       ack: 'Rozumiem, że kredyty wykorzystane na klip nie podlegają zwrotowi, poza przypadkami wymaganymi przez prawo.',
       paid: (n) => `Płatność przyjęta. Dodano ${n} kredytów.`,
@@ -267,6 +277,7 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
     credits: {
       balance: (n) => `잔액: ${n} 크레딧`,
       buyTitle: '크레딧 구매',
+      vatIls: 'VAT 포함', taxUsd: '+ 세금', policyLink: '환불 정책',
       pack: (c, p) => `${c} 크레딧 ${p}`,
       ack: '클립 제작에 사용한 크레딧은 법에서 정한 경우를 제외하고 환불되지 않음을 이해했습니다.',
       paid: (n) => `결제가 확인되었습니다. ${n} 크레딧이 추가되었습니다.`,

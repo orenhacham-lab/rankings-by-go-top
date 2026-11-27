@@ -65,6 +65,13 @@ export default function EnglishRefundPolicyPage() {
       </section>
 
       <section>
+        <h2>4A. Video studio credits</h2>
+        <p>
+          Credits are bought in advance and are used to create clips. Credits that were used to create a clip are not refunded, except where the law requires. A clip that fails returns its credits to your account automatically. Credits do not expire. A request under the law (for example a consumer asking to cancel a purchase of unused credits): contact@gotopseo.com from the email address of the account, as in section 5.
+        </p>
+      </section>
+
+      <section>
         <h2>5. How to request a cancellation under the law</h2>
         <p>
           Email <a href="mailto:contact@gotopseo.com">contact@gotopseo.com</a> from your account&rsquo;s email

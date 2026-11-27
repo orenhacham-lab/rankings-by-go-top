@@ -29,6 +29,10 @@ Los pagos de la suscripción no se reembolsan, incluso si usted cancela antes de
 
 La única excepción es cuando la ley exige un reembolso. Por ejemplo, un consumidor que haya contratado el Servicio principalmente para uso personal, y no para una empresa, puede tener derecho a desistir conforme a la Ley de Protección del Consumidor de Israel o a la ley de protección del consumidor del país en el que resida. En ese caso, respetaremos ese derecho en la medida y en los términos que establezca la ley. La sección 5 dice exactamente qué significa eso en España y en la Unión Europea.
 
+## 4A. Créditos del estudio de vídeo
+
+Los créditos se compran por adelantado y sirven para crear clips. Los créditos utilizados para crear un clip no se reembolsan, salvo cuando la ley lo exija. Un clip que falla devuelve automáticamente sus créditos a su cuenta. Los créditos no caducan. Para una solicitud basada en la ley (por ejemplo, un consumidor que pide cancelar la compra de créditos no utilizados): escriba a contact@gotopseo.com desde la dirección de correo de la cuenta, como en la sección 5.
+
 ## 5. Derecho de desistimiento de catorce días en España y en la Unión Europea
 
 Esta sección dice, para quien contrate desde España o desde otro Estado miembro de la Unión Europea, qué significa aquí exactamente la excepción de la sección 4. No es una concesión comercial: es un derecho que la ley le reconoce y que nosotros no podemos recortar.

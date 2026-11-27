@@ -29,6 +29,10 @@ I pagamenti dell'abbonamento non sono rimborsati, anche se Lei disdice prima del
 
 L'unica eccezione è il caso in cui la legge esige il rimborso. Per esempio, un consumatore che ha sottoscritto il Servizio principalmente per un uso personale, e non per un'impresa, può disporre di un diritto di recesso in forza della legge israeliana sulla protezione del consumatore o del diritto dei consumatori del Paese in cui risiede. In tal caso rispettiamo quel diritto nella misura e secondo le modalità che la legge prevede. La sezione 5 dice esattamente che cosa significa questo in Italia e nell'Unione europea.
 
+## 4A. Crediti dello studio video
+
+I crediti si acquistano in anticipo e servono a creare clip. I crediti usati per creare un clip non vengono rimborsati, salvo quando la legge lo impone. Un clip non riuscito restituisce automaticamente i suoi crediti al Suo account. I crediti non scadono. Per una richiesta prevista dalla legge (ad esempio un consumatore che chiede di annullare l'acquisto di crediti non utilizzati): scriva a contact@gotopseo.com dall'indirizzo e-mail dell'account, come nella sezione 5.
+
 ## 5. Diritto di recesso di quattordici giorni in Italia e nell'Unione europea
 
 Questa sezione rende esplicito, per chi sottoscrive dall'Italia o da un altro Stato membro dell'Unione europea, che cosa significa qui l'eccezione della sezione 4. Non è una cortesia commerciale: è un diritto che la legge Le riconosce e che noi non possiamo ridurre.

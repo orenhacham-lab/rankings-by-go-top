@@ -31,6 +31,10 @@ Zahlungen für das Abonnement werden nicht zurückerstattet, auch wenn Sie vor d
 
 Die einzige Ausnahme ist der Fall, in dem das Gesetz die Rückerstattung verlangt. Zum Beispiel kann einem Verbraucher, der den Dienst überwiegend für den privaten Gebrauch und nicht für ein Unternehmen abgeschlossen hat, nach dem israelischen Verbraucherschutzgesetz oder nach dem Verbraucherrecht seines Wohnsitzlandes ein Widerrufsrecht zustehen. In diesem Fall beachten wir dieses Recht in dem Umfang und auf die Weise, die das Gesetz vorsieht. Abschnitt 5 sagt genau, was das in Deutschland und in der Europäischen Union bedeutet.
 
+## 4A. Credits für das Videostudio
+
+Credits werden im Voraus gekauft und dienen zum Erstellen von Clips. Credits, die zum Erstellen eines Clips verwendet wurden, werden nicht erstattet, soweit das Gesetz nichts anderes vorschreibt. Schlägt ein Clip fehl, werden seine Credits automatisch Ihrem Konto gutgeschrieben. Credits verfallen nicht. Für eine Anfrage nach geltendem Recht (zum Beispiel ein Verbraucher, der den Kauf nicht genutzter Credits widerrufen möchte): Schreiben Sie von der E-Mail-Adresse des Kontos an contact@gotopseo.com, wie in Abschnitt 5.
+
 ## 5. Vierzehntägiges Widerrufsrecht in Deutschland und in der Europäischen Union
 
 Dieser Abschnitt macht für jeden, der aus Deutschland oder aus einem anderen Mitgliedstaat der Europäischen Union abschließt, ausdrücklich, was die Ausnahme in Abschnitt 4 hier bedeutet. Das ist kein kaufmännisches Entgegenkommen: es ist ein Recht, das das Gesetz Ihnen gibt und das wir nicht verkürzen können.

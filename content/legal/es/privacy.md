@@ -219,6 +219,10 @@ Al eliminar la foto, o al pasar a ninguna foto o al icono del sitio, se borra el
 
 Respecto de la persona que aparece en la foto, el cliente que la subió es quien decide para qué se usa, y nosotros tratamos el archivo por cuenta suya. Si usted es la persona de la foto y no el cliente que la subió, escríbanos a la dirección que figura al final de esta política: borraremos el archivo de nuestro almacenamiento y nos dirigiremos al cliente para que retire la copia del sitio, pero no podemos eliminar nosotros mismos contenido en el sitio de un cliente.
 
+## Estudio de vídeo
+
+Cuando usted crea un clip, las fotos que sube y la descripción que escribe se envían al modelo de vídeo de Google (API de Gemini) para generarlo. Guardamos las fotos y el clip terminado en un almacenamiento privado al que solo puede acceder su cuenta, durante un máximo de 7 días; después se eliminan. Conservamos el identificador de la solicitud, su duración, su coste en créditos y su resultado, para poder cobrar y reembolsar créditos. No usamos las fotos ni los clips para publicidad ni los vendemos. Suba solo fotos que tenga derecho a usar. No suba fotos de una persona identificable sin su consentimiento.
+
 ## Proveedores de IA
 
 Algunas funciones envían datos a los siguientes servicios de IA para producir el resultado que usted solicitó:

@@ -217,6 +217,10 @@ Apagar a foto, ou passar para nenhuma foto ou para o ícone do site, exclui o ar
 
 Quanto à pessoa retratada, o cliente que enviou a foto é quem decide para que ela é usada, e nós tratamos o arquivo por conta dele. Se você é a pessoa da foto e não o cliente que a enviou, escreva para o endereço que está no fim desta política: vamos apagar o arquivo do nosso armazenamento e procurar o cliente para que a cópia no site seja retirada, mas não podemos excluir por conta própria conteúdo no site de um cliente.
 
+## Estúdio de vídeo
+
+Quando você cria um clipe, as fotos que envia e a descrição que escreve são enviadas ao modelo de vídeo do Google (API Gemini) para gerá-lo. Guardamos as fotos e o clipe pronto em armazenamento privado, ao qual só a sua conta tem acesso, por até 7 dias; depois são excluídos. Guardamos o identificador do pedido, sua duração, seu custo em créditos e seu resultado, para cobrar e devolver créditos. Não usamos as fotos nem os clipes em publicidade e não os vendemos. Envie apenas fotos que você tenha o direito de usar. Não envie fotos de uma pessoa identificável sem o consentimento dela.
+
 ## Provedores de IA
 
 Alguns recursos enviam dados aos seguintes serviços de IA para produzir o resultado que você pediu:

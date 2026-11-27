@@ -29,6 +29,10 @@ Les paiements de l'abonnement ne sont pas remboursés, même si vous résiliez a
 
 La seule exception est le cas où la loi exige le remboursement. Par exemple, un consommateur qui a souscrit le Service principalement pour un usage personnel, et non pour une entreprise, peut disposer d'un droit de rétractation en vertu de la loi israélienne sur la protection du consommateur ou du droit de la consommation du pays où il réside. Dans ce cas, nous respectons ce droit dans la mesure et selon les modalités que la loi prévoit. La section 5 dit exactement ce que cela signifie en France et dans l'Union européenne.
 
+## 4A. Crédits du studio vidéo
+
+Les crédits s'achètent à l'avance et servent à créer des clips. Les crédits utilisés pour créer un clip ne sont pas remboursés, sauf lorsque la loi l'exige. Un clip qui échoue restitue automatiquement ses crédits à votre compte. Les crédits n'expirent pas. Pour une demande fondée sur la loi (par exemple un consommateur qui demande l'annulation de l'achat de crédits non utilisés) : écrivez à contact@gotopseo.com depuis l'adresse e-mail du compte, comme à la section 5.
+
 ## 5. Droit de rétractation de quatorze jours en France et dans l'Union européenne
 
 Cette section explicite, pour qui souscrit depuis la France ou depuis un autre État membre de l'Union européenne, ce que l'exception de la section 4 signifie ici. Elle n'est pas une faveur commerciale : c'est un droit que la loi vous donne et que nous ne pouvons pas réduire.

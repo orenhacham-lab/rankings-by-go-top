@@ -221,6 +221,10 @@ De foto verwijderen of overstappen op geen foto of op het pictogram van de websi
 
 Over de persoon die op de foto voorkomt beslist de klant die haar heeft geüpload, en wij verwerken het bestand in zijn opdracht. Bent u de persoon op de foto en niet de klant die haar heeft geüpload, schrijf ons dan op het adres aan het einde van deze verklaring: wij halen het bestand uit onze opslag en wenden ons tot de klant, zodat hij de kopie van de website haalt, maar wij kunnen content op de website van een klant niet zelf verwijderen.
 
+## Videostudio
+
+Wanneer u een clip maakt, worden de foto's die u uploadt en de beschrijving die u schrijft naar het videomodel van Google (Gemini-API) gestuurd om de clip te maken. We bewaren de foto's en de voltooide clip in een privéopslag waartoe alleen uw account toegang heeft, maximaal 7 dagen; daarna worden ze verwijderd. We bewaren de aanvraag-ID, de lengte, de kosten in credits en het resultaat, zodat we credits kunnen afschrijven en terugstorten. We gebruiken foto's of clips niet voor reclame en verkopen ze niet. Upload alleen foto's waarvoor u het recht hebt ze te gebruiken. Upload geen foto's van een identificeerbaar persoon zonder diens toestemming.
+
 ## AI-leveranciers
 
 Enkele functies sturen gegevens naar de volgende AI-diensten, om het resultaat te maken dat u hebt gevraagd:

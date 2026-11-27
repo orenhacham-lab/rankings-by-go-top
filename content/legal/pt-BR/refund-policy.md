@@ -29,6 +29,10 @@ Os pagamentos da assinatura não são reembolsados, mesmo que você cancele ante
 
 A única exceção é quando a lei exige o reembolso. Por exemplo, um consumidor que tenha contratado o Serviço principalmente para uso pessoal, e não para uma empresa, pode ter direito de desistir conforme a Lei de Proteção ao Consumidor de Israel ou conforme a lei de proteção ao consumidor do país onde reside. Nesse caso, respeitaremos esse direito na medida e nos termos que a lei estabelecer.
 
+## 4A. Créditos do estúdio de vídeo
+
+Os créditos são comprados antecipadamente e servem para criar clipes. Créditos usados para criar um clipe não são reembolsados, exceto quando a lei exigir. Um clipe que falha devolve seus créditos automaticamente à sua conta. Os créditos não expiram. Para um pedido com base na lei (por exemplo, um consumidor que pede o cancelamento da compra de créditos não utilizados): escreva para contact@gotopseo.com a partir do e-mail da conta, como na seção 5.
+
 ## 5. Direito de arrependimento de sete dias no Brasil
 
 Esta seção explicita, para quem contrata do Brasil, o que a exceção da seção 4 significa aqui.

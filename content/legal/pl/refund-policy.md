@@ -31,6 +31,10 @@ Opłat za abonament nie zwracamy, także wtedy, gdy Państwo zrezygnują przed k
 
 Jedyny wyjątek to przypadek, w którym zwrotu żąda prawo. I tak konsument, który zawarł umowę przede wszystkim do użytku prywatnego, a nie dla firmy, może mieć prawo odstąpienia na podstawie izraelskiej ustawy o ochronie konsumenta albo na podstawie prawa konsumenckiego państwa swojego miejsca zamieszkania. W takim przypadku szanujemy to prawo w zakresie i w sposób, które prawo przewiduje. Część 5 mówi dokładnie, co to znaczy w Polsce i w Unii Europejskiej.
 
+## 4A. Kredyty studia wideo
+
+Kredyty kupuje się z góry i służą one do tworzenia klipów. Kredyty wykorzystane do utworzenia klipu nie podlegają zwrotowi, z wyjątkiem sytuacji, w których wymaga tego prawo. Nieudany klip automatycznie zwraca swoje kredyty na Państwa konto. Kredyty nie wygasają. W sprawie żądania opartego na prawie (na przykład konsument, który prosi o anulowanie zakupu niewykorzystanych kredytów): prosimy napisać na contact@gotopseo.com z adresu e-mail konta, jak w sekcji 5.
+
 ## 5. Prawo odstąpienia w ciągu czternastu dni w Polsce i w Unii Europejskiej
 
 Ta część mówi wyraźnie każdemu, kto zawiera umowę z Polski albo z innego państwa członkowskiego Unii Europejskiej, co znaczy tutaj wyjątek z części 4. To nie jest ustępstwo handlowe: to prawo, które daje Państwu ustawa i którego nie możemy skrócić.
