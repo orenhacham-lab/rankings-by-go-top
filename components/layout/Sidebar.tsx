@@ -17,8 +17,10 @@ import { useWaiting } from '@/components/nudges/useWaiting'
 import { pillText, railCounts } from '@/lib/nudges/rows'
 import { NAV_DRAWER_EVENT, type NavDrawerRequest } from '@/lib/shell/nav-drawer'
 import type { LucideIcon } from 'lucide-react'
+import { VIDEO_STUDIO_COPY } from '@/lib/video-studio/copy'
 import {
   CalendarClock,
+  Clapperboard,
   Handshake,
   LayoutGrid,
   Telescope,
@@ -63,10 +65,12 @@ type NavItem = {
   icon: LucideIcon
   onboarding?: string
 } & (
-  | { labelKey: SidebarLabelKey; screenKey?: never; metaLabel?: never }
-  | { screenKey: ContentScreenKey; labelKey?: never; metaLabel?: never }
+  | { labelKey: SidebarLabelKey; screenKey?: never; metaLabel?: never; videoLabel?: never }
+  | { screenKey: ContentScreenKey; labelKey?: never; metaLabel?: never; videoLabel?: never }
   /** Facebook/Instagram posts: its words live in lib/i18n/meta-posts.ts. */
-  | { metaLabel: true; labelKey?: never; screenKey?: never }
+  | { metaLabel: true; labelKey?: never; screenKey?: never; videoLabel?: never }
+  /** The video studio: its words live in lib/video-studio/copy.ts. */
+  | { videoLabel: true; labelKey?: never; screenKey?: never; metaLabel?: never }
 )
 
 type NavGroup = {
@@ -170,6 +174,7 @@ const navGroupKeys: readonly NavGroup[] = [
       { href: '/site-links', labelKey: 'siteLinks', icon: Waypoints },
       ...mapsPostsNavItems,
       ...socialPostsNavItems,
+      { href: '/video-studio', videoLabel: true, icon: Clapperboard },
     ],
   },
   {
@@ -231,6 +236,7 @@ export function activeNavHref(pathname: string, items: readonly NavItem[]): stri
 
 function navLabel(dict: ReturnType<typeof getDashboardDictionary>, item: NavItem, uiLocale: PublicLocale): string {
   if (item.metaLabel) return metaPostsText(uiLocale).navLabel
+  if (item.videoLabel) return VIDEO_STUDIO_COPY[uiLocale].title
   if (item.screenKey) return dict.contentHub.screens[item.screenKey]
   return dict.sidebar[item.labelKey]
 }
