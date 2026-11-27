@@ -155,9 +155,12 @@ export async function listMetaPages(userToken: string, fetchImpl: FetchLike = fe
     after = paging?.next && typeof paging.cursors?.after === 'string' ? paging.cursors.after : null
     if (!after) break
   }
-  if (out.length === 0) {
-    try { return await listGrantedPages(userToken, fetchImpl) } catch { return out }
-  }
+  // Always add the Pages the person ticked in the dialog: /me/accounts alone misses the ones
+  // reached through a Business Portfolio, even when it lists some others.
+  try {
+    const seen = new Set(out.map((p) => p.pageId))
+    for (const page of await listGrantedPages(userToken, fetchImpl)) if (!seen.has(page.pageId)) out.push(page)
+  } catch { /* the direct list stands on its own */ }
   return out
 }
 

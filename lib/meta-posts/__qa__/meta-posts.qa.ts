@@ -256,7 +256,9 @@ async function main() {
   check('the app secret goes in a header, never in the URL', !!dbg && /^Bearer 1234567890\|/.test(dbg.auth ?? '') && !dbg.url.includes('app-secret-for-tests'))
   calls.length = 0
   const direct = await O.listMetaPages('USERTOKEN', mkFetch([{ id: '555', name: 'Direct', access_token: 'T' }]))
-  check('a direct Page role is used as before, with no fallback call', direct.length === 1 && direct[0].pageId === '555' && !calls.some((c) => c.url.includes('/debug_token')))
+  check('a direct Page role is kept and the ticked Page is added next to it, without duplicates', direct.length === 2 && direct[0].pageId === '555' && direct[1].pageId === '112080178267908')
+  const dup = await O.listMetaPages('USERTOKEN', mkFetch([{ id: '112080178267908', name: 'Go Top SEO', access_token: 'T' }]))
+  check('a Page that is both direct and ticked appears once', dup.length === 1)
   // MUTATION: when Meta refuses the fallback the list is empty, not a crash, and the guard above would fail on it.
   const refused = (async (url: string) => new Response(JSON.stringify(url.includes('/me/accounts') ? { data: [] } : { error: { code: 190 } }), { status: url.includes('/me/accounts') ? 200 : 400 })) as unknown as typeof fetch
   check('MUTATION — a refused fallback gives an empty list, which the fallback check would catch', (await O.listMetaPages('USERTOKEN', refused)).length === 0)
