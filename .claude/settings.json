@@ -10,6 +10,7 @@
       "Bash(npm view *)",
       "mcp__Vercel__get_runtime_logs",
       "mcp__Supabase__query_logs",
+      "mcp__Supabase__apply_migration",
       "mcp__github__pull_request_read",
       "mcp__github__get_commit",
       "mcp__github__get_file_contents",
