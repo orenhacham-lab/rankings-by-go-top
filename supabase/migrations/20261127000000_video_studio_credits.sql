@@ -81,3 +81,40 @@ create policy video_jobs_owner_read on public.video_jobs for select using (user_
 -- Private bucket: clips are served only through short-lived signed URLs.
 insert into storage.buckets (id, name, public) values ('video-studio', 'video-studio', false)
   on conflict (id) do nothing;
+
+-- Purchases: one row per provider payment. (provider, provider_ref) is unique, so a retried
+-- capture or a repeated webhook can never grant the credits twice.
+create table if not exists public.video_credit_purchases (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null check (provider in ('paypal', 'creem')),
+  provider_ref text not null,
+  pack text not null,
+  credits integer not null check (credits > 0),
+  amount_minor integer not null check (amount_minor > 0),
+  currency text not null check (currency in ('ILS', 'USD')),
+  created_at timestamptz not null default now(),
+  unique (provider, provider_ref)
+);
+alter table public.video_credit_purchases enable row level security;
+drop policy if exists video_credit_purchases_owner_read on public.video_credit_purchases;
+create policy video_credit_purchases_owner_read on public.video_credit_purchases for select using (user_id = auth.uid());
+
+-- true when the credits were granted now, false when this payment was already booked.
+create or replace function public.video_credit_purchase(p_user uuid, p_credits integer, p_provider text, p_ref text, p_pack text, p_amount integer, p_currency text)
+returns boolean language plpgsql security definer set search_path = public as $$
+declare ins integer;
+begin
+  if p_credits <= 0 then return false; end if;
+  insert into public.video_credit_purchases (user_id, provider, provider_ref, pack, credits, amount_minor, currency)
+    values (p_user, p_provider, p_ref, p_pack, p_credits, p_amount, p_currency)
+    on conflict (provider, provider_ref) do nothing;
+  get diagnostics ins = row_count;
+  if ins = 0 then return false; end if;
+  insert into public.video_credit_wallets (user_id, balance) values (p_user, p_credits)
+    on conflict (user_id) do update set balance = public.video_credit_wallets.balance + excluded.balance, updated_at = now();
+  insert into public.video_credit_ledger (user_id, delta, reason) values (p_user, p_credits, 'purchase');
+  return true;
+end $$;
+revoke all on function public.video_credit_purchase(uuid, integer, text, text, text, integer, text) from public, anon, authenticated;
+grant execute on function public.video_credit_purchase(uuid, integer, text, text, text, integer, text) to service_role;
