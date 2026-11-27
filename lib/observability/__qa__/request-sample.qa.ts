@@ -12,7 +12,7 @@
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  classifyUserAgent, botToken, requestSampleLine, logRequestSample, REQUEST_SAMPLE_ONE_IN,
+  classifyUserAgent, botToken, isAnonymousCrawler, requestSampleLine, logRequestSample, REQUEST_SAMPLE_ONE_IN,
 } from '@/lib/observability/request-sample'
 
 let passed = 0
@@ -140,6 +140,23 @@ async function main() {
     const noHint = await mutant("const hint = GENERIC_TOKENS.has(token.toLowerCase())", "const hint = false && GENERIC_TOKENS.has(token.toLowerCase())")
     const noHintLine = noHint.requestSampleLine({ pathname: '/', userAgent: 'Mozilla/5.0 (compatible; Acme crawler 2.1; +https://acme.example/info)' }, 0) ?? ''
     check('F9 dropping the hint leaves an anonymous crawler unidentified, which I1 catches', !/ua=/.test(noHintLine), noHintLine)
+
+    const SCRAPER = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36 crawler'
+    check('J1 the anonymous Chrome-posing crawler is refused', isAnonymousCrawler(SCRAPER))
+    check('J2 named search and AI crawlers are never refused',
+      [UA.googlebot, UA.bing, UA.gpt, UA.claude, UA.perplexity, UA.ahrefs].every(u => !isAnonymousCrawler(u)))
+    check('J3 browsers, empty agents and bots with a real product name are not refused',
+      !isAnonymousCrawler(UA.chrome) && !isAnonymousCrawler(null) && !isAnonymousCrawler('') &&
+      !isAnonymousCrawler('Mozilla/5.0 (compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot) Chrome/100.0 Safari/537.36') &&
+      !isAnonymousCrawler('curl/8.0'))
+    const pxy = strip2(readFileSync('proxy.ts', 'utf8'))
+    check('J4 the proxy refuses it with 403, never on /api/, and after the sample',
+      /startsWith\('\/api\/'\) && isAnonymousCrawler\(/.test(pxy) && /status: 403/.test(pxy) && pxy.indexOf('logRequestSample(request)') < pxy.indexOf('isAnonymousCrawler('))
+    const open = await mutant("return botToken(ua).toLowerCase() === 'crawler' &&", "return true &&")
+    check('J5 dropping the token test would refuse bots with real names, which J3 catches',
+      open.isAnonymousCrawler('Mozilla/5.0 (compatible; Amazonbot/0.1) Chrome/100.0 Safari/537.36'))
+    const noBlock = pxy.replace("isAnonymousCrawler(request.headers.get('user-agent'))", 'false')
+    check('J6 removing the call from the proxy fails J4', !/isAnonymousCrawler\(/.test(noBlock))
 
     const unnamed = await mutant('for (const [name, pattern] of NAMED) if (pattern.test(ua)) return name', '')
     check('F3 dropping the named crawlers collapses GPTBot into a generic bot, which A3 catches',
