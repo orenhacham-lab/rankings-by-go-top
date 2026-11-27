@@ -129,12 +129,15 @@ async function listGrantedPages(userToken: string, fetchImpl: FetchLike): Promis
     if (gs.scope !== 'pages_show_list' && gs.scope !== 'pages_manage_posts') continue
     for (const id of Array.isArray(gs.target_ids) ? gs.target_ids : []) if (typeof id === 'string' && /^[0-9]{1,32}$/.test(id)) ids.add(id)
   }
+  // Read the ticked Pages a few at a time: a person with dozens of client Pages would otherwise wait for each call in turn.
+  const wanted = [...ids].slice(0, 100)
   const out: MetaPage[] = []
-  for (const id of [...ids].slice(0, 25)) {
-    try {
-      const page = toMetaPage(await metaGraphGet(`/${id}`, { fields: PAGE_FIELDS, access_token: userToken }, fetchImpl))
-      if (page) out.push(page)
-    } catch { /* one unreadable Page does not hide the others */ }
+  for (let i = 0; i < wanted.length; i += 8) {
+    const batch = await Promise.all(wanted.slice(i, i + 8).map(async (id) => {
+      try { return toMetaPage(await metaGraphGet(`/${id}`, { fields: PAGE_FIELDS, access_token: userToken }, fetchImpl)) }
+      catch { return null } // one unreadable Page does not hide the others
+    }))
+    for (const page of batch) if (page) out.push(page)
   }
   return out
 }

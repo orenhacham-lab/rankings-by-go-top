@@ -259,6 +259,16 @@ async function main() {
   check('a direct Page role is kept and the ticked Page is added next to it, without duplicates', direct.length === 2 && direct[0].pageId === '555' && direct[1].pageId === '112080178267908')
   const dup = await O.listMetaPages('USERTOKEN', mkFetch([{ id: '112080178267908', name: 'Go Top SEO', access_token: 'T' }]))
   check('a Page that is both direct and ticked appears once', dup.length === 1)
+  const many = Array.from({ length: 42 }, (_, i) => String(9000 + i))
+  const manyFetch = (async (url: string) => {
+    const id = many.find((m) => url.includes(`/${m}?`))
+    const body = url.includes('/me/accounts') ? { data: [] }
+      : url.includes('/debug_token') ? { data: { granular_scopes: [{ scope: 'pages_manage_posts', target_ids: many }] } }
+      : id ? { id, name: `P${id}`, access_token: 'T' } : { error: { code: 100 } }
+    return new Response(JSON.stringify(body), { status: 'error' in body ? 400 : 200 })
+  }) as unknown as typeof fetch
+  const manyPages = await O.listMetaPages('USERTOKEN', manyFetch)
+  check('all 42 ticked Pages are listed, none cut off', manyPages.length === 42 && new Set(manyPages.map((p) => p.pageId)).size === 42)
   // MUTATION: when Meta refuses the fallback the list is empty, not a crash, and the guard above would fail on it.
   const refused = (async (url: string) => new Response(JSON.stringify(url.includes('/me/accounts') ? { data: [] } : { error: { code: 190 } }), { status: url.includes('/me/accounts') ? 200 : 400 })) as unknown as typeof fetch
   check('MUTATION — a refused fallback gives an empty list, which the fallback check would catch', (await O.listMetaPages('USERTOKEN', refused)).length === 0)
