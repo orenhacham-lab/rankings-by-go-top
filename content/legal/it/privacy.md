@@ -221,6 +221,10 @@ Cancellando la foto, o passando a nessuna foto o all'icona del sito, si elimina 
 
 Riguardo alla persona che appare nella foto, è il cliente che l'ha inviata a decidere dell'uso che ne è fatto, e noi trattiamo il file per suo conto. Se Lei è la persona della foto e non il cliente che l'ha inviata, ci scriva all'indirizzo che figura alla fine della presente informativa: elimineremo il file dal nostro archivio e ci rivolgeremo al cliente perché rimuova la copia dal sito, ma non possiamo cancellare noi stessi contenuto sul sito di un cliente.
 
+## Studio video
+
+Quando Lei crea un clip, le foto che carica e la descrizione che scrive vengono inviate al modello video di Google (API Gemini) per generarlo. Conserviamo le foto e il clip finito in uno spazio di archiviazione privato a cui può accedere solo il Suo account, per un massimo di 7 giorni; poi vengono eliminati. Conserviamo l'identificativo della richiesta, la sua durata, il suo costo in crediti e il suo esito, per addebitare e rimborsare i crediti. Non usiamo le foto né i clip per la pubblicità e non li vendiamo. Carichi solo foto che ha il diritto di usare. Non carichi foto di una persona identificabile senza il suo consenso.
+
 ## Fornitori di IA
 
 Alcune funzioni inviano dati ai seguenti servizi di IA per produrre il risultato che Lei ha chiesto:

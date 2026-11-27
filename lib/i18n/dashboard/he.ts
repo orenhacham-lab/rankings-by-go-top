@@ -12,7 +12,7 @@ export const dashboardHe = {
     clients: 'לקוחות',
     projects: 'פרויקטים',
     keywords: 'מילות מפתח',
-    keywordResearch: 'מה מחפשים לקוחות',
+    keywordResearch: 'מה הלקוחות מחפשים',
     siteLinks: 'קישורים לאתר',
     mapsPosts: 'פוסטים בגוגל מפות',
     aiVisibility: 'ChatGPT ו-AI',

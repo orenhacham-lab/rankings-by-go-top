@@ -221,6 +221,10 @@ Usunięcie zdjęcia albo przejście na brak zdjęcia lub na ikonę witryny wyjmu
 
 O osobie występującej na zdjęciu decyduje klient, który je wgrał, a my przetwarzamy plik na jego zlecenie. Jeśli Państwo są osobą na zdjęciu, a nie klientem, który je wgrał, prosimy napisać do nas na adres z końca tej polityki: wyjmiemy plik z naszego magazynu i zwrócimy się do klienta, żeby usunął kopię z witryny, ale sami nie możemy usunąć treści na witrynie klienta.
 
+## Studio wideo
+
+Gdy tworzą Państwo klip, przesłane przez Państwa zdjęcia i napisany przez Państwa opis są wysyłane do modelu wideo Google (Gemini API), aby go wygenerować. Zdjęcia i gotowy klip przechowujemy w prywatnej pamięci, do której dostęp ma tylko Państwa konto, przez maksymalnie 7 dni, po czym są usuwane. Przechowujemy identyfikator żądania, jego długość, koszt w kredytach i wynik, aby naliczać opłaty i zwracać kredyty. Nie używamy zdjęć ani klipów do reklamy i ich nie sprzedajemy. Prosimy przesyłać tylko zdjęcia, do których mają Państwo prawo. Prosimy nie przesyłać zdjęć osoby możliwej do zidentyfikowania bez jej zgody.
+
 ## Dostawcy AI
 
 Niektóre funkcje przesyłają dane do następujących usług AI, żeby utworzyć wynik, o który Państwo poprosili:

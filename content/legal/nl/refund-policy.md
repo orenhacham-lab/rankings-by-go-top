@@ -31,6 +31,10 @@ Betalingen voor het abonnement worden niet terugbetaald, ook niet als u voor het
 
 De enige uitzondering is het geval waarin de wet de terugbetaling verlangt. Zo kan een consument die de dienst overwegend voor privégebruik en niet voor een bedrijf heeft afgesloten, op grond van de Israëlische wet op de consumentenbescherming of op grond van het consumentenrecht van zijn land van verblijf een recht van ontbinding hebben. In dat geval eerbiedigen wij dat recht in de omvang en op de wijze die de wet voorschrijft. Onderdeel 5 zegt precies wat dat in Nederland en in de Europese Unie betekent.
 
+## 4A. Credits voor de videostudio
+
+Credits worden vooraf gekocht en gebruikt om clips te maken. Credits die zijn gebruikt om een clip te maken, worden niet terugbetaald, behalve wanneer de wet dat vereist. Een clip die mislukt, schrijft zijn credits automatisch weer bij op uw account. Credits verlopen niet. Voor een verzoek op grond van de wet (bijvoorbeeld een consument die de aankoop van ongebruikte credits wil annuleren): stuur een e-mail naar contact@gotopseo.com vanaf het e-mailadres van het account, zoals in sectie 5.
+
 ## 5. Het recht van ontbinding van veertien dagen in Nederland en in de Europese Unie
 
 Dit onderdeel maakt voor ieder die vanuit Nederland of vanuit een andere lidstaat van de Europese Unie afsluit uitdrukkelijk wat de uitzondering in onderdeel 4 hier betekent. Dat is geen commerciële tegemoetkoming: het is een recht dat de wet u geeft en dat wij niet kunnen inkorten.

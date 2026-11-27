@@ -221,6 +221,10 @@ Das Foto zu löschen oder auf kein Foto oder das Symbol der Website zu wechseln,
 
 Über die Person, die auf dem Foto erscheint, entscheidet der Kunde, der es hochgeladen hat, und wir verarbeiten die Datei in seinem Auftrag. Wenn Sie die Person auf dem Foto sind und nicht der Kunde, der es hochgeladen hat, schreiben Sie uns an die Adresse am Ende dieser Erklärung: wir entfernen die Datei aus unserem Speicher und wenden uns an den Kunden, damit er die Kopie von der Website nimmt, aber wir können Inhalte auf der Website eines Kunden nicht selbst löschen.
 
+## Videostudio
+
+Wenn Sie einen Clip erstellen, werden die von Ihnen hochgeladenen Fotos und die von Ihnen verfasste Beschreibung zur Erstellung an das Videomodell von Google (Gemini-API) gesendet. Wir speichern die Fotos und den fertigen Clip in einem privaten Speicher, auf den nur Ihr Konto zugreifen kann, für höchstens 7 Tage; danach werden sie gelöscht. Wir speichern die Anfragekennung, die Länge, die Kosten in Credits und das Ergebnis, damit wir Credits abbuchen und zurückerstatten können. Wir verwenden Fotos und Clips nicht für Werbung und verkaufen sie nicht. Laden Sie nur Fotos hoch, an denen Sie die erforderlichen Rechte haben. Laden Sie keine Fotos einer identifizierbaren Person ohne deren Einwilligung hoch.
+
 ## KI-Anbieter
 
 Einige Funktionen senden Daten an die folgenden KI-Dienste, um das Ergebnis zu erzeugen, das Sie verlangt haben:

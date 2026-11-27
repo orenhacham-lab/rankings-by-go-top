@@ -221,6 +221,10 @@ En supprimant la photo, ou en passant à aucune photo ou à l'icône du site, on
 
 À l'égard de la personne qui apparaît sur la photo, c'est le client qui l'a envoyée qui décide de l'usage qui en est fait, et nous traitons le fichier pour son compte. Si vous êtes la personne de la photo et non le client qui l'a envoyée, écrivez-nous à l'adresse qui figure à la fin de la présente politique : nous effacerons le fichier de notre stockage et nous nous adresserons au client pour qu'il retire la copie du site, mais nous ne pouvons pas supprimer nous-mêmes du contenu sur le site d'un client.
 
+## Studio vidéo
+
+Lorsque vous créez un clip, les photos que vous importez et la description que vous rédigez sont envoyées au modèle vidéo de Google (API Gemini) pour le produire. Nous conservons les photos et le clip terminé dans un espace de stockage privé auquel seul votre compte a accès, pendant 7 jours au plus, puis ils sont supprimés. Nous conservons l'identifiant de la demande, sa durée, son coût en crédits et son résultat, afin de facturer et de rembourser des crédits. Nous n'utilisons pas les photos ni les clips à des fins publicitaires et nous ne les vendons pas. N'importez que des photos que vous avez le droit d'utiliser. N'importez pas de photos d'une personne identifiable sans son consentement.
+
 ## Fournisseurs d'IA
 
 Certaines fonctions envoient des données aux services d'IA suivants pour produire le résultat que vous avez demandé :
