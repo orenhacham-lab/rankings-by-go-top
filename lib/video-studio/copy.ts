@@ -15,6 +15,7 @@ export interface VideoStudioCopy {
   resultTitle: string; download: string; keptFor: string
   errors: Record<'insufficient_credits' | 'daily_limit' | 'too_many_images' | 'images_too_large' | 'invalid_request' | 'failed', string>
   noPhotos: string
+  credits: { balance: (n: number) => string; buyTitle: string; pack: (credits: number, price: string) => string; ack: string; paid: (n: number) => string; payFailed: string }
 }
 
 
@@ -33,6 +34,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: 'חסר משהו בבקשה. בדקו את התיאור והאורך.', failed: 'היצירה לא הצליחה והקרדיטים הוחזרו. אפשר לנסות שוב.',
     },
     noPhotos: 'אפשר ליצור גם בלי תמונות, אבל עם תמונה התוצאה דומה יותר לעסק שלך.',
+    credits: {
+      balance: (n) => `יתרה: ${n} קרדיטים`,
+      buyTitle: 'קניית קרדיטים',
+      pack: (c, p) => `${c} קרדיטים ב-${p}`,
+      ack: 'אני מבין שקרדיטים ששימשו ליצירת קליפ לא מוחזרים, למעט מה שהחוק מחייב.',
+      paid: (n) => `התשלום התקבל. נוספו ${n} קרדיטים.`,
+      payFailed: 'התשלום לא הושלם. לא חויבת בקרדיטים. אפשר לנסות שוב.',
+    },
   },
   en: {
     title: 'Video studio', subtitle: 'Upload photos, describe what you want to see, and get a short clip ready for social.',
@@ -48,6 +57,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: 'Something is missing. Check the description and the length.', failed: 'The clip could not be made and your credits were returned. You can try again.',
     },
     noPhotos: 'You can also create without photos, but a photo makes the clip look more like your business.',
+    credits: {
+      balance: (n) => `Balance: ${n} credits`,
+      buyTitle: 'Buy credits',
+      pack: (c, p) => `${c} credits for ${p}`,
+      ack: 'I understand that credits used to make a clip are not refunded, except as the law requires.',
+      paid: (n) => `Payment received. ${n} credits added.`,
+      payFailed: 'The payment did not complete. No credits were added. You can try again.',
+    },
   },
   es: {
     title: 'Estudio de vídeo', subtitle: 'Sube fotos, describe lo que quieres ver y recibe un clip corto listo para redes.',
@@ -63,6 +80,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: 'Falta algo. Revisa la descripción y la duración.', failed: 'No se pudo crear el clip y se devolvieron tus créditos. Puedes intentarlo de nuevo.',
     },
     noPhotos: 'También puedes crear sin fotos, pero con una foto el clip se parece más a tu negocio.',
+    credits: {
+      balance: (n) => `Saldo: ${n} créditos`,
+      buyTitle: 'Comprar créditos',
+      pack: (c, p) => `${c} créditos por ${p}`,
+      ack: 'Entiendo que los créditos usados para crear un clip no se reembolsan, salvo lo que exija la ley.',
+      paid: (n) => `Pago recibido. Se añadieron ${n} créditos.`,
+      payFailed: 'El pago no se completó. No se añadieron créditos. Puedes intentarlo de nuevo.',
+    },
   },
   'pt-BR': {
     title: 'Estúdio de vídeo', subtitle: 'Envie fotos, descreva o que quer ver e receba um clipe curto pronto para as redes.',
@@ -78,6 +103,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: 'Falta algo. Confira a descrição e a duração.', failed: 'Não foi possível criar o clipe e seus créditos foram devolvidos. Tente de novo.',
     },
     noPhotos: 'Também dá para criar sem fotos, mas com uma foto o clipe fica mais parecido com o seu negócio.',
+    credits: {
+      balance: (n) => `Saldo: ${n} créditos`,
+      buyTitle: 'Comprar créditos',
+      pack: (c, p) => `${c} créditos por ${p}`,
+      ack: 'Entendo que créditos usados para criar um clipe não são reembolsados, exceto quando a lei exigir.',
+      paid: (n) => `Pagamento recebido. ${n} créditos adicionados.`,
+      payFailed: 'O pagamento não foi concluído. Nenhum crédito foi adicionado. Tente de novo.',
+    },
   },
   fr: {
     title: 'Studio vidéo', subtitle: 'Importez des photos, décrivez ce que vous voulez voir et recevez un court clip prêt pour les réseaux.',
@@ -93,6 +126,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: 'Il manque quelque chose. Vérifiez la description et la durée.', failed: "Le clip n'a pas pu être créé et vos crédits ont été rendus. Vous pouvez réessayer.",
     },
     noPhotos: 'Vous pouvez aussi créer sans photo, mais avec une photo le clip ressemble davantage à votre activité.',
+    credits: {
+      balance: (n) => `Solde : ${n} crédits`,
+      buyTitle: 'Acheter des crédits',
+      pack: (c, p) => `${c} crédits pour ${p}`,
+      ack: 'Je comprends que les crédits utilisés pour créer un clip ne sont pas remboursés, sauf ce que la loi impose.',
+      paid: (n) => `Paiement reçu. ${n} crédits ajoutés.`,
+      payFailed: 'Le paiement n\'a pas abouti. Aucun crédit n\'a été ajouté. Vous pouvez réessayer.',
+    },
   },
   it: {
     title: 'Studio video', subtitle: 'Carica le foto, descrivi cosa vuoi vedere e ricevi una breve clip pronta per i social.',
@@ -108,6 +149,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: 'Manca qualcosa. Controlla la descrizione e la durata.', failed: 'Non è stato possibile creare la clip e i crediti ti sono stati restituiti. Puoi riprovare.',
     },
     noPhotos: "Puoi creare anche senza foto, ma con una foto la clip somiglia di più alla tua attività.",
+    credits: {
+      balance: (n) => `Saldo: ${n} crediti`,
+      buyTitle: 'Acquista crediti',
+      pack: (c, p) => `${c} crediti a ${p}`,
+      ack: 'Capisco che i crediti usati per creare una clip non vengono rimborsati, salvo quanto previsto dalla legge.',
+      paid: (n) => `Pagamento ricevuto. Aggiunti ${n} crediti.`,
+      payFailed: 'Il pagamento non è andato a buon fine. Nessun credito aggiunto. Puoi riprovare.',
+    },
   },
   ja: {
     title: '動画スタジオ', subtitle: '写真をアップロードし、見たい内容を書くと、SNS向けの短いクリップができあがります。',
@@ -123,6 +172,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: '入力に不足があります。内容と長さをご確認ください。', failed: 'クリップを作成できませんでした。クレジットは戻っています。もう一度お試しください。',
     },
     noPhotos: '写真なしでも作成できますが、写真があるとお店のイメージに近づきます。',
+    credits: {
+      balance: (n) => `残高：${n}クレジット`,
+      buyTitle: 'クレジットを購入',
+      pack: (c, p) => `${c}クレジット：${p}`,
+      ack: 'クリップの作成に使用したクレジットは、法律で定められた場合を除き返金されないことを理解しました。',
+      paid: (n) => `お支払いを確認しました。${n}クレジットを追加しました。`,
+      payFailed: 'お支払いが完了しませんでした。クレジットは追加されていません。もう一度お試しください。',
+    },
   },
   de: {
     title: 'Video-Studio', subtitle: 'Fotos hochladen, beschreiben, was zu sehen sein soll, und einen kurzen Clip für Social Media erhalten.',
@@ -138,6 +195,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: 'Es fehlt etwas. Prüfen Sie Beschreibung und Länge.', failed: 'Der Clip konnte nicht erstellt werden, Ihre Credits wurden zurückgegeben. Versuchen Sie es erneut.',
     },
     noPhotos: 'Sie können auch ohne Fotos erstellen, mit einem Foto sieht der Clip aber mehr nach Ihrem Geschäft aus.',
+    credits: {
+      balance: (n) => `Guthaben: ${n} Credits`,
+      buyTitle: 'Credits kaufen',
+      pack: (c, p) => `${c} Credits für ${p}`,
+      ack: 'Ich verstehe, dass für einen Clip verbrauchte Credits nicht erstattet werden, außer wo das Gesetz es verlangt.',
+      paid: (n) => `Zahlung erhalten. ${n} Credits hinzugefügt.`,
+      payFailed: 'Die Zahlung wurde nicht abgeschlossen. Es wurden keine Credits hinzugefügt. Sie können es erneut versuchen.',
+    },
   },
   nl: {
     title: 'Videostudio', subtitle: 'Upload foto’s, beschrijf wat je wilt zien en ontvang een korte clip die klaar is voor social media.',
@@ -153,6 +218,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: 'Er ontbreekt iets. Controleer de beschrijving en de lengte.', failed: 'De clip kon niet worden gemaakt en je credits zijn teruggegeven. Probeer het opnieuw.',
     },
     noPhotos: 'Je kunt ook zonder foto’s maken, maar met een foto lijkt de clip meer op jouw bedrijf.',
+    credits: {
+      balance: (n) => `Saldo: ${n} credits`,
+      buyTitle: 'Credits kopen',
+      pack: (c, p) => `${c} credits voor ${p}`,
+      ack: 'Ik begrijp dat credits die voor een clip zijn gebruikt niet worden terugbetaald, behalve waar de wet dat vereist.',
+      paid: (n) => `Betaling ontvangen. ${n} credits toegevoegd.`,
+      payFailed: 'De betaling is niet voltooid. Er zijn geen credits toegevoegd. Je kunt het opnieuw proberen.',
+    },
   },
   pl: {
     title: 'Studio wideo', subtitle: 'Prześlij zdjęcia, opisz, co chcesz zobaczyć, i otrzymaj krótki klip gotowy do mediów społecznościowych.',
@@ -168,6 +241,14 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: 'Czegoś brakuje. Sprawdź opis i długość.', failed: 'Nie udało się utworzyć klipu, a kredyty zostały zwrócone. Spróbuj ponownie.',
     },
     noPhotos: 'Możesz tworzyć też bez zdjęć, ale ze zdjęciem klip bardziej przypomina Twoją firmę.',
+    credits: {
+      balance: (n) => `Saldo: ${n} kredytów`,
+      buyTitle: 'Kup kredyty',
+      pack: (c, p) => `${c} kredytów za ${p}`,
+      ack: 'Rozumiem, że kredyty wykorzystane na klip nie podlegają zwrotowi, poza przypadkami wymaganymi przez prawo.',
+      paid: (n) => `Płatność przyjęta. Dodano ${n} kredytów.`,
+      payFailed: 'Płatność nie została zakończona. Nie dodano kredytów. Możesz spróbować ponownie.',
+    },
   },
   ko: {
     title: '동영상 스튜디오', subtitle: '사진을 올리고 보고 싶은 장면을 적으면 SNS용 짧은 클립을 받을 수 있습니다.',
@@ -183,5 +264,13 @@ export const VIDEO_STUDIO_COPY: Record<PublicLocale, VideoStudioCopy> = {
       invalid_request: '빠진 내용이 있습니다. 설명과 길이를 확인하세요.', failed: '클립을 만들지 못했고 크레딧은 돌려드렸습니다. 다시 시도해 주세요.',
     },
     noPhotos: '사진 없이도 만들 수 있지만, 사진이 있으면 매장 느낌에 더 가까워집니다.',
+    credits: {
+      balance: (n) => `잔액: ${n} 크레딧`,
+      buyTitle: '크레딧 구매',
+      pack: (c, p) => `${c} 크레딧 ${p}`,
+      ack: '클립 제작에 사용한 크레딧은 법에서 정한 경우를 제외하고 환불되지 않음을 이해했습니다.',
+      paid: (n) => `결제가 확인되었습니다. ${n} 크레딧이 추가되었습니다.`,
+      payFailed: '결제가 완료되지 않았습니다. 크레딧은 추가되지 않았습니다. 다시 시도해 주세요.',
+    },
   },
 }

@@ -11,7 +11,7 @@ import { VIDEO_STUDIO_COPY } from '../copy'
 
 let passed = 0, failed = 0
 const ok = (c: boolean, m: string) => { if (c) passed++; else { failed++; console.log('FAIL:', m) } }
-const flat = (c: any): string[] => Object.values(c).flatMap((v) => v === undefined ? [''] : typeof v === 'string' ? [v] : typeof v === 'function' ? [(v as (n: number) => string)(5)] : flat(v))
+const flat = (c: any): string[] => Object.values(c).flatMap((v) => v === undefined ? [''] : typeof v === 'string' ? [v] : typeof v === 'function' ? [(v as (n: number, p: string) => string)(5, '9')] : flat(v))
 const keys = (c: any, p = ''): string[] => Object.entries(c).flatMap(([k, v]) => typeof v === 'object' ? keys(v, `${p}${k}.`) : [`${p}${k}`])
 const ref = keys(VIDEO_STUDIO_COPY.en)
 

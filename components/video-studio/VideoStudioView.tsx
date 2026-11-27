@@ -1,15 +1,104 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Header from '@/components/layout/Header'
 import WorkspaceGate from '@/components/layout/WorkspaceGate'
 import Notice from '@/components/ui/Notice'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { VIDEO_STUDIO_COPY } from '@/lib/video-studio/copy'
 import { creditsFor } from '@/lib/video-studio/cost'
+import { CREDIT_PACKS, majorAmount, type PackId } from '@/lib/video-studio/packs'
+import { PAYPAL_LOCALE } from '@/lib/i18n/locales'
 import { MAX_PROMPT_CHARS, MAX_REFERENCE_IMAGES, MAX_SECONDS, MIN_SECONDS } from '@/lib/video-studio/config'
 
 interface Photo { id: number; data: string; mimeType: 'image/jpeg'; preview: string }
+interface PayPalPackWindow extends Window {
+  paypal?: { Buttons: (o: {
+    style: Record<string, string>
+    createOrder: () => Promise<string>
+    onApprove: (d: { orderID?: string }) => Promise<void>
+    onError: () => void
+  }) => { render: (el: HTMLElement) => Promise<void> } }
+}
+
+/** Balance, and (Israel only) credit packs paid through PayPal. The server prices and verifies everything. */
+function Credits({ onBalance, refreshKey }: { onBalance: (n: number) => void; refreshKey: number }) {
+  const { uiLocale } = useDashboardLanguage()
+  const t = VIDEO_STUDIO_COPY[uiLocale].credits
+  const [balance, setBalance] = useState<number | null>(null)
+  const [canBuy, setCanBuy] = useState(false)
+  const [ack, setAck] = useState(false)
+  const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
+  const [version, setVersion] = useState(0)
+  const slots = useRef<Partial<Record<PackId, HTMLDivElement | null>>>({})
+
+  useEffect(() => {
+    let live = true
+    fetch('/api/video-studio/credits', { cache: 'no-store' }).then((r) => r.json()).then((b) => {
+      if (!live || !b?.ok) return
+      setBalance(b.balance); onBalance(b.balance); setCanBuy(!!b.canBuy)
+    }).catch(() => undefined)
+    return () => { live = false }
+  }, [refreshKey, version, onBalance])
+
+  useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
+    if (!canBuy || !ack || !clientId) return
+    const render = () => {
+      const w = window as PayPalPackWindow
+      if (!w.paypal) return
+      for (const id of Object.keys(CREDIT_PACKS) as PackId[]) {
+        const el = slots.current[id]
+        if (!el || el.childElementCount) continue
+        void w.paypal.Buttons({
+          style: { shape: 'rect', color: 'gold', layout: 'horizontal', label: 'pay' },
+          createOrder: async () => {
+            const r = await fetch('/api/video-studio/packs/paypal/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pack: id }) })
+            const b = await r.json().catch(() => null)
+            if (!r.ok || !b?.orderId) throw new Error('create_failed')
+            return b.orderId as string
+          },
+          onApprove: async (d) => {
+            const r = await fetch('/api/video-studio/packs/paypal/capture', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderId: d.orderID }) })
+            const b = await r.json().catch(() => null)
+            if (r.ok && b?.ok) { setMsg({ tone: 'ok', text: t.paid(b.credits) }); setVersion((v) => v + 1) } else setMsg({ tone: 'bad', text: t.payFailed })
+          },
+          onError: () => setMsg({ tone: 'bad', text: t.payFailed }),
+        }).render(el)
+      }
+    }
+    const existing = document.getElementById('paypal-packs-sdk')
+    if (existing) { render(); return }
+    // intent=capture: the billing page's SDK is for subscriptions, this one is for one-time orders.
+    const script = document.createElement('script')
+    script.id = 'paypal-packs-sdk'
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=ILS&intent=capture&locale=${PAYPAL_LOCALE[uiLocale]}`
+    script.async = true
+    script.onload = render
+    document.body.appendChild(script)
+  }, [canBuy, ack, uiLocale, t])
+
+  if (balance === null) return null
+  return (
+    <section className="space-y-3" data-video-credits="">
+      <p className="text-sm font-medium">{t.balance(balance)}</p>
+      {canBuy && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-medium">{t.buyTitle}</h2>
+          <label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5" />{t.ack}</label>
+          {ack && (Object.keys(CREDIT_PACKS) as PackId[]).map((id) => (
+            <div key={id} className="space-y-1">
+              <p className="text-sm">{t.pack(CREDIT_PACKS[id].credits, `${majorAmount(CREDIT_PACKS[id].amountMinor.ILS)} ₪`)}</p>
+              <div ref={(el) => { slots.current[id] = el }} />
+            </div>
+          ))}
+        </div>
+      )}
+      {msg && <Notice tone={msg.tone === 'ok' ? 'ok' : 'bad'}>{msg.text}</Notice>}
+    </section>
+  )
+}
+
 type Phase = { kind: 'idle' } | { kind: 'working' } | { kind: 'done'; url: string } | { kind: 'error'; text: string }
 
 /** Shrinks a photo to at most 1280 px on its long side, as JPEG, so six of them fit in one request. */
@@ -34,6 +123,8 @@ function Screen({ projectId }: { projectId: string }) {
   const [aspect, setAspect] = useState<'9:16' | '16:9'>('9:16')
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' })
   const next = useRef(1)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [, setBalance] = useState(0)
 
   async function onFiles(files: FileList | null) {
     if (!files) return
@@ -53,6 +144,7 @@ function Screen({ projectId }: { projectId: string }) {
       body: JSON.stringify({ projectId, prompt, seconds, aspect, images: photos.map((p) => ({ data: p.data, mimeType: p.mimeType })) }),
     }).catch(() => null)
     const body = res ? await res.json().catch(() => null) : null
+    setRefreshKey((k) => k + 1)
     if (res?.ok && body?.ok && typeof body.url === 'string') { setPhase({ kind: 'done', url: body.url }); return }
     const code = typeof body?.error === 'string' ? body.error : ''
     const known = ['insufficient_credits', 'daily_limit', 'too_many_images', 'images_too_large', 'invalid_request'] as const
@@ -63,6 +155,7 @@ function Screen({ projectId }: { projectId: string }) {
   const working = phase.kind === 'working'
   return (
     <div className="max-w-2xl space-y-6">
+      <Credits onBalance={setBalance} refreshKey={refreshKey} />
       <section className="space-y-2">
         <h2 className="text-sm font-medium">{t.photos}</h2>
         <p className="text-xs text-muted-foreground">{t.photosHint}</p>
