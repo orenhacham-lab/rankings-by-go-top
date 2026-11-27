@@ -2,6 +2,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { creemWebhookSecret, isCreemEnabled } from '@/lib/creem/config'
 import { CREEM_SIGNATURE_HEADER, verifyCreemSignature } from '@/lib/creem/signature'
 import { fetchCreemSubscription } from '@/lib/creem/client'
+import { isVideoCreditCheckoutEvent } from '@/lib/video-studio/creem-webhook'
+import { confirmPackCheckout } from '@/lib/video-studio/creem-packs'
+import { realCreemPackDeps } from '@/lib/video-studio/pack-deps'
 import { lockBillingMarket } from '@/lib/billing/billing-market-selection'
 import { storedMarketOf, STORED_MARKET_KEY } from '@/lib/billing/server-market'
 import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
@@ -88,6 +91,19 @@ async function handle(request: Request): Promise<Response> {
   }
 
   // From here the delivery is confirmed to be Creem's.
+  // A one-time credit-pack checkout is not a subscription: the credits are granted from
+  // Creem's own read-back of the checkout, idempotently (same grant the return page runs).
+  const videoCheckout = isVideoCreditCheckoutEvent(parsed)
+  if (videoCheckout) {
+    const r = await confirmPackCheckout(realCreemPackDeps, null, videoCheckout.checkoutId)
+    if (r.ok) return Response.json({ status: 'received' })
+    console.warn('[creem-webhook] video credits not granted', { error: r.error })
+    // Provider/DB trouble is retryable; a mismatch or an unpaid checkout will not change on retry.
+    return r.error === 'provider_failed' || r.error === 'unexpected'
+      ? Response.json({ error: r.error }, { status: 503 })
+      : Response.json({ status: 'received' })
+  }
+
   const admin = createAdminClient()
   const outcome = await processVerifiedCreemEvent(admin, parsed as CreemWebhookEvent, {
     fetchSubscription: (subscriptionId) => fetchCreemSubscription(subscriptionId),
