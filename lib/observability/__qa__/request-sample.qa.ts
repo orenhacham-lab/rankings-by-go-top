@@ -69,6 +69,10 @@ async function main() {
     check('H4 a generic machine says which word gave it away', /bot=headless /.test(headless), headless)
     check('H2 a browser line has no bot token', !/bot=/.test(line))
     check('H3 the token is capped and never the whole UA', botToken('x'.repeat(80) + 'bot').length <= 24 && !/Mozilla/.test(amazon))
+    const anon = requestSampleLine({ pathname: '/', userAgent: 'Mozilla/5.0 (compatible; Acme crawler 2.1; +https://acme.example/info)' }, 0) ?? ''
+    check('I1 a bare "crawler" token also says the start of its agent string', /bot=crawler ua=\(compatible; Acme crawler 2\.1/.test(anon), anon)
+    check('I2 a named bot does not get the agent string', !/ua=/.test(amazon), amazon)
+    check('I3 the hint is capped at 80 characters', (requestSampleLine({ pathname: '/', userAgent: 'x crawler ' + 'y'.repeat(300) }, 0) ?? '').length < 200)
     check('C1 the line carries the class and the rate', /class=browser/.test(line) && /oneIn=10/.test(line), line)
     check('C2 it carries no path, no query and no agent string',
       !/secret-id|token|abc|Macintosh|Chrome|Mozilla|dashboard/.test(line), line)
@@ -132,6 +136,10 @@ async function main() {
     const wholeUa = await mutant("if (m) return m[1].slice(0, 24)", "if (m) return userAgent ?? '-'")
     const wholeLine = wholeUa.requestSampleLine({ pathname: '/', userAgent: 'Mozilla/5.0 (compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot)' }, 0) ?? ''
     check('F8 a token that was the whole UA fails H3', /Mozilla/.test(wholeLine), wholeLine)
+
+    const noHint = await mutant("const hint = GENERIC_TOKENS.has(token.toLowerCase())", "const hint = false && GENERIC_TOKENS.has(token.toLowerCase())")
+    const noHintLine = noHint.requestSampleLine({ pathname: '/', userAgent: 'Mozilla/5.0 (compatible; Acme crawler 2.1; +https://acme.example/info)' }, 0) ?? ''
+    check('F9 dropping the hint leaves an anonymous crawler unidentified, which I1 catches', !/ua=/.test(noHintLine), noHintLine)
 
     const unnamed = await mutant('for (const [name, pattern] of NAMED) if (pattern.test(ua)) return name', '')
     check('F3 dropping the named crawlers collapses GPTBot into a generic bot, which A3 catches',

@@ -75,6 +75,9 @@ export function botToken(userAgent: string | null | undefined): string {
   return g ? g[0].toLowerCase().slice(0, 24) : '-'
 }
 
+/** Product tokens that identify no one. */
+const GENERIC_TOKENS: ReadonlySet<string> = new Set(['crawler', 'crawl', 'bot', 'spider', 'fetch', 'monitor', 'scrape', 'headless', 'curl/', 'wget', '-'])
+
 /** The line, or null when this request is not in the sample. Pure, so it can be tested without a request. */
 export function requestSampleLine(
   input: { pathname: string; userAgent: string | null | undefined },
@@ -82,7 +85,15 @@ export function requestSampleLine(
 ): string | null {
   if (!(random < 1 / REQUEST_SAMPLE_ONE_IN)) return null
   const cls = classifyUserAgent(input.userAgent)
-  const who = cls === 'other-bot' ? ` bot=${botToken(input.userAgent)}` : ''
+  const token = cls === 'other-bot' ? botToken(input.userAgent) : ''
+  // A bare generic word ("crawler", "bot", "fetch") names nobody, and on
+  // 27 Nov 2026 one such agent was about 60% of all sampled requests. For that
+  // case only, say the start of the agent string so it can be identified. A
+  // machine's agent string is public by design; browsers never reach here.
+  const hint = GENERIC_TOKENS.has(token.toLowerCase())
+    ? ` ua=${(input.userAgent ?? '').replace(/^Mozilla\/5\.0\s*/i, '').replace(/\s+/g, ' ').trim().slice(0, 80)}`
+    : ''
+  const who = cls === 'other-bot' ? ` bot=${token}${hint}` : ''
   return `[req-sample] class=${cls}${who} oneIn=${REQUEST_SAMPLE_ONE_IN}`
 }
 
