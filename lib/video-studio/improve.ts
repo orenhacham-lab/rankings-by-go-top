@@ -5,7 +5,7 @@
  * never blocked by this step. Customer text is never logged here.
  */
 import { CAMERA_PHRASE, GOALS, MOOD_PHRASE, STYLE_PHRASE, isCameraId, isGoalId, isMoodId, isStyleId, type PlanInput } from './presets'
-import { CLOSING, fallbackPrompt } from './fallback-prompt'
+import { CLOSING, DENY, fallbackPrompt } from './fallback-prompt'
 import { isValidSeconds } from './cost'
 import type { PublicLocale } from '@/lib/i18n/locales'
 
@@ -90,11 +90,10 @@ export function buildModelBody(i: PlanInput, locale: PublicLocale): Record<strin
   return {
     systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
     contents: [{ role: 'user', parts: [{ text: buildUserTurn(i, locale) }] }],
-    generationConfig: { temperature: 0.7, maxOutputTokens: 700, responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
+    generationConfig: { temperature: 0.7, maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 }, responseMimeType: 'application/json', responseSchema: RESPONSE_SCHEMA },
   }
 }
 
-const DENY = /https?:|www\.|@|\d{3,}|%|[$₪€£]|\b(sale|discount|guarantee|cure|best price)\b/i
 
 /** The model's answer, or null when anything about it is off. */
 export function acceptModelOutput(raw: unknown): { prompt: string; summary: string; notes: string[] } | null {

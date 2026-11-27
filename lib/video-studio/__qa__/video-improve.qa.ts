@@ -7,7 +7,7 @@
  */
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { acceptModelOutput, allowImprove, buildUserTurn, improvePrompt, parsePlanInput, SYSTEM_PROMPT } from '../improve'
+import { acceptModelOutput, allowImprove, buildModelBody, buildUserTurn, improvePrompt, parsePlanInput, SYSTEM_PROMPT } from '../improve'
 import { CLOSING, fallbackPrompt } from '../fallback-prompt'
 import { MAX_PROMPT_CHARS } from '../config'
 
@@ -64,7 +64,15 @@ async function main() {
   // Mutation controls
   ok(acceptModelOutput({ ...good, prompt: good.prompt.replace(CLOSING, 'Photorealistic. sale') }) === null, 'M1 a deny-listed word is caught (if the deny list were removed this would fail)')
   ok(!/authContentProject/.test(route.replaceAll('authContentProject', 'x')), 'M2 removing the auth call fails F1')
-  console.log(`${passed} passed, ${failed} failed`)
+  // Found with the real model (27.11): thinking tokens ate the 700-token budget and cut the JSON, so every call fell back.
+{
+  const gc = (buildModelBody({ idea: 'x', goal: null, style: null, mood: null, camera: null, seconds: 5, aspect: '9:16', photoCount: 0 }, 'en') as any).generationConfig
+  ok(gc.thinkingConfig?.thinkingBudget === 0 && gc.maxOutputTokens >= 1000, 'R: thinking is off and the output budget leaves room for the JSON')
+  const fb = fallbackPrompt({ idea: 'מבצע 50% הנחה רק ב-99 שקל', goal: 'offer', style: null, mood: null, camera: null, seconds: 5, aspect: '9:16', photoCount: 0 })
+  ok(!/50%|99|הנחה|שקל/.test(fb), 'R: the local fallback never carries price or offer words onto the video')
+  ok(/behind|show|eye-catching|reveal|introduction/.test(fb) || fb.includes('A short marketing clip'), 'R: the fallback uses the goal instead')
+}
+console.log(`${passed} passed, ${failed} failed`)
   if (failed) process.exit(1)
 }
 main()
