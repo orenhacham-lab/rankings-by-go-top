@@ -27,6 +27,8 @@ function Credits({ onBalance, refreshKey }: { onBalance: (n: number) => void; re
   const t = VIDEO_STUDIO_COPY[uiLocale].credits
   const [balance, setBalance] = useState<number | null>(null)
   const [canBuy, setCanBuy] = useState(false)
+  const [provider, setProvider] = useState<'paypal' | 'creem' | null>(null)
+  const [busy, setBusy] = useState(false)
   const [ack, setAck] = useState(false)
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
   const [version, setVersion] = useState(0)
@@ -36,14 +38,37 @@ function Credits({ onBalance, refreshKey }: { onBalance: (n: number) => void; re
     let live = true
     fetch('/api/video-studio/credits', { cache: 'no-store' }).then((r) => r.json()).then((b) => {
       if (!live || !b?.ok) return
-      setBalance(b.balance); onBalance(b.balance); setCanBuy(!!b.canBuy)
+      setBalance(b.balance); onBalance(b.balance); setCanBuy(!!b.canBuy); setProvider(b.provider === 'paypal' || b.provider === 'creem' ? b.provider : null)
     }).catch(() => undefined)
     return () => { live = false }
   }, [refreshKey, version, onBalance])
 
+  // Back from Creem's checkout: the server reads the payment back and grants the credits once.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search)
+    const checkoutId = q.get('pack') === 'creem' ? q.get('checkout_id') : null
+    if (!checkoutId) return
+    window.history.replaceState(null, '', window.location.pathname)
+    void fetch('/api/video-studio/packs/creem/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ checkoutId }) })
+      .then((r) => r.json().catch(() => null)).then((b) => {
+        if (b?.ok) { setMsg({ tone: 'ok', text: t.paid(b.credits) }); setVersion((v) => v + 1) } else setMsg({ tone: 'bad', text: t.payFailed })
+      }).catch(() => setMsg({ tone: 'bad', text: t.payFailed }))
+  }, [t])
+
+  const buyWithCreem = async (pack: PackId) => {
+    setBusy(true)
+    try {
+      const r = await fetch('/api/video-studio/packs/creem/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pack }) })
+      const b = await r.json().catch(() => null)
+      if (r.ok && typeof b?.checkoutUrl === 'string') { window.location.assign(b.checkoutUrl); return }
+      setMsg({ tone: 'bad', text: t.payFailed })
+    } catch { setMsg({ tone: 'bad', text: t.payFailed }) }
+    setBusy(false)
+  }
+
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID
-    if (!canBuy || !ack || !clientId) return
+    if (!canBuy || provider !== 'paypal' || !ack || !clientId) return
     const render = () => {
       const w = window as PayPalPackWindow
       if (!w.paypal) return
@@ -76,20 +101,28 @@ function Credits({ onBalance, refreshKey }: { onBalance: (n: number) => void; re
     script.async = true
     script.onload = render
     document.body.appendChild(script)
-  }, [canBuy, ack, uiLocale, t])
+  }, [canBuy, provider, ack, uiLocale, t])
 
   if (balance === null) return null
   return (
     <section className="space-y-3" data-video-credits="">
       <p className="text-sm font-medium">{t.balance(balance)}</p>
-      {canBuy && (
+      {(canBuy || provider === 'creem') && (
         <div className="space-y-2">
           <h2 className="text-sm font-medium">{t.buyTitle}</h2>
           <label className="flex items-start gap-2 text-xs"><input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} className="mt-0.5" />{t.ack}</label>
           {ack && (Object.keys(CREDIT_PACKS) as PackId[]).map((id) => (
             <div key={id} className="space-y-1">
-              <p className="text-sm">{t.pack(CREDIT_PACKS[id].credits, `${majorAmount(CREDIT_PACKS[id].amountMinor.ILS)} ₪`)}</p>
-              <div ref={(el) => { slots.current[id] = el }} />
+              {provider === 'creem' ? (
+                <button type="button" disabled={busy} onClick={() => void buyWithCreem(id)} className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50">
+                  {t.pack(CREDIT_PACKS[id].credits, `$${majorAmount(CREDIT_PACKS[id].amountMinor.USD)}`)}
+                </button>
+              ) : (
+                <>
+                  <p className="text-sm">{t.pack(CREDIT_PACKS[id].credits, `${majorAmount(CREDIT_PACKS[id].amountMinor.ILS)} ₪`)}</p>
+                  <div ref={(el) => { slots.current[id] = el }} />
+                </>
+              )}
             </div>
           ))}
         </div>

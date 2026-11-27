@@ -95,7 +95,7 @@ export interface CreemSubscriptionSnapshot {
 }
 
 /** An object field, whether Creem sends `product` as an id or as an object. */
-function idOf(value: unknown): string | null {
+export function idOf(value: unknown): string | null {
   if (typeof value === 'string') return value.trim() || null
   if (value && typeof value === 'object' && 'id' in value) {
     const id = (value as { id?: unknown }).id
@@ -104,13 +104,13 @@ function idOf(value: unknown): string | null {
   return null
 }
 
-function stringOf(value: unknown): string | null {
+export function stringOf(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
 /** A money field as a finite number, or null. Never coerced from nonsense:
  *  a commission is not computed from a figure we had to guess at. */
-function minorAmountOf(value: unknown): number | null {
+export function minorAmountOf(value: unknown): number | null {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null
   if (typeof value === 'string' && value.trim()) {
     const parsed = Number(value)
@@ -141,7 +141,7 @@ export function creemTransactionOf(value: unknown): CreemTransactionSnapshot | n
   }
 }
 
-async function creemFetch(
+export async function creemFetch(
   path: string,
   init: { method: 'GET' | 'POST'; body?: unknown },
 ): Promise<CreemResult<unknown>> {

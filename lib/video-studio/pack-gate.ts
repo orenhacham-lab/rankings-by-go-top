@@ -10,18 +10,27 @@ import { logRestrictedAttempt, restrictionForRequest } from '@/lib/sanctions/gua
 import { KOREA_SALE_REFUSAL_REASON, koreaOwnSaleBlockedForRequest } from '@/lib/billing/korea-sale'
 import { OWN_NAME_SALE_REFUSAL_REASON, ownNameSaleBlockedForRequest } from '@/lib/billing/own-name-sale'
 import { resolveBillingMarket, storedMarketOf } from '@/lib/billing/server-market'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { isShopifyBillingRequiredForUser } from '@/lib/shopify/paypal-block'
+import { hasPendingShopifyLinkCookie } from '@/lib/shopify/pending-link'
+import { creemMayWriteToAccount, isCreemEnabled } from '@/lib/creem/config'
 
 const refuse = (reason: string, status: number) => Response.json({ error: 'Not available', reason }, { status })
 
-export async function packGate(request: Request, wantMarket: 'ILS'): Promise<{ user: { id: string } } | Response> {
+export async function packGate(request: Request, wantMarket: 'ILS' | 'USD'): Promise<{ user: { id: string } } | Response> {
   if (!isVideoStudioEnabled()) return Response.json({ error: 'Not found' }, { status: 404 })
   const restricted = restrictionForRequest(request.headers)
   if (restricted) { logRestrictedAttempt('video-packs', restricted); return refuse('restricted_country', 451) }
   if (koreaOwnSaleBlockedForRequest(request.headers)) return refuse(KOREA_SALE_REFUSAL_REASON, 451)
   if (ownNameSaleBlockedForRequest(request.headers)) return refuse(OWN_NAME_SALE_REFUSAL_REASON, 451)
+  if (wantMarket === 'USD' && !isCreemEnabled()) return refuse('creem_not_enabled', 503)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+  // Shopify-connected accounts are billed through Shopify, exactly as the plan checkouts enforce.
+  if (hasPendingShopifyLinkCookie(request)) return refuse('shopify_link_pending', 403)
+  if (await isShopifyBillingRequiredForUser(createAdminClient(), user.id)) return refuse('shopify_store_connected', 403)
+  if (wantMarket === 'USD' && !creemMayWriteToAccount(user.id)) return refuse('sandbox_mode', 503)
   const market = storedMarketOf(user) ?? (await resolveBillingMarket(supabase, user).catch(() => null))?.market ?? null
   if (market !== wantMarket) return refuse('market_not_supported', 409)
   return { user: { id: user.id } }

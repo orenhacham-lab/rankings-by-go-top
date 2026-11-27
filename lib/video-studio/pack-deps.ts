@@ -21,3 +21,26 @@ export const realPayPalPackDeps: PayPalPackDeps = {
     return error ? null : data === true
   },
 }
+
+import { createCreemCheckout } from '@/lib/creem/client'
+import { fetchCreemCheckout } from '@/lib/creem/checkout-read'
+import { creemReturnOrigin } from '@/lib/creem/config'
+import type { CreemPackDeps } from './creem-packs'
+
+export const realCreemPackDeps: CreemPackDeps = {
+  createCheckout: (p) => createCreemCheckout({
+    productId: p.productId,
+    // Our own origin and a fixed path: nothing from the request becomes a redirect.
+    successUrl: `${creemReturnOrigin()}/video-studio?pack=creem`,
+    requestId: p.requestId,
+    customerEmail: p.customerEmail,
+    metadata: p.metadata,
+  }),
+  readCheckout: (id) => fetchCreemCheckout(id),
+  async grant(g) {
+    const { data, error } = await createAdminClient().rpc('video_credit_purchase', {
+      p_user: g.userId, p_credits: g.credits, p_provider: 'creem', p_ref: g.ref, p_pack: g.pack, p_amount: g.amountMinor, p_currency: g.currency,
+    })
+    return error ? null : data === true
+  },
+}
