@@ -78,6 +78,20 @@ export function botToken(userAgent: string | null | undefined): string {
 /** Product tokens that identify no one. */
 const GENERIC_TOKENS: ReadonlySet<string> = new Set(['crawler', 'crawl', 'bot', 'spider', 'fetch', 'monitor', 'scrape', 'headless', 'curl/', 'wget', '-'])
 
+/**
+ * The anonymous scraper measured on 27 Nov 2026: about 60% of all requests,
+ * a Chrome-looking Mozilla agent whose only machine marker is the bare word
+ * "crawler" (no product name, no contact URL). Every named crawler (Googlebot,
+ * Bingbot, GPTBot, ClaudeBot, PerplexityBot, ...) is classified before
+ * `other-bot`, so it never reaches this test, and an unnamed bot with a real
+ * product token (Amazonbot, Bytespider) has a token other than "crawler".
+ */
+export function isAnonymousCrawler(userAgent: string | null | undefined): boolean {
+  const ua = userAgent ?? ''
+  if (classifyUserAgent(ua) !== 'other-bot') return false
+  return botToken(ua).toLowerCase() === 'crawler' && /^Mozilla\/5\.0/i.test(ua.trim()) && /Chrome\//.test(ua)
+}
+
 /** The line, or null when this request is not in the sample. Pure, so it can be tested without a request. */
 export function requestSampleLine(
   input: { pathname: string; userAgent: string | null | undefined },

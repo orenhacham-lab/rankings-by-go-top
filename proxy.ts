@@ -13,7 +13,7 @@ import {
   isRestrictedPath, logRestrictedAttempt, noticeLocaleForPath,
   restrictionForRequest, sanctionsNotice,
 } from '@/lib/sanctions/guard'
-import { logRequestSample } from '@/lib/observability/request-sample'
+import { isAnonymousCrawler, logRequestSample } from '@/lib/observability/request-sample'
 import { CRAWLER_CACHE_HEADER, CRAWLER_CDN_CACHE, CRAWLER_PARAM, isCacheableCrawlerRequest } from '@/lib/crawler-cache'
 
 export async function proxy(request: NextRequest) {
@@ -23,6 +23,13 @@ export async function proxy(request: NextRequest) {
   // First, so a refusal below is counted too; it never throws and never changes
   // the response. Remove it once the CPU driver is known.
   logRequestSample(request)
+
+  // An anonymous scraper posing as Chrome was ~60% of all requests (27 Nov
+  // 2026) and every page view is a billed function call. Refuse it at once;
+  // named crawlers (search and AI) never match. API routes are left alone.
+  if (!pathname.startsWith('/api/') && isAnonymousCrawler(request.headers.get('user-agent'))) {
+    return new NextResponse(null, { status: 403, headers: { 'cache-control': 'no-store' } })
+  }
 
   // TEMPORARY (with the sampler): the matcher below now lets /api through only
   // so it can be counted. An API route authenticates itself (see CLAUDE.md), so
