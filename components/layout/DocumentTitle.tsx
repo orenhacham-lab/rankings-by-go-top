@@ -13,12 +13,13 @@ import { navItemKeys, adminNavItems } from '@/components/layout/Sidebar'
 import { useDashboardLanguage } from '@/lib/i18n/dashboard/useDashboardLanguage'
 import { getDashboardDictionary } from '@/lib/i18n/dashboard/getDashboardDictionary'
 import { metaPostsText } from '@/lib/i18n/meta-posts'
+import { VIDEO_STUDIO_COPY } from '@/lib/video-studio/copy'
 import type { PublicLocale } from '@/lib/i18n/locales'
 import { pageTitle, type TitledRoute } from '@/lib/shell/page-title'
 
 export function dashboardTitleRoutes(dict: ReturnType<typeof getDashboardDictionary>, uiLocale: PublicLocale = 'en'): TitledRoute[] {
   const label = (item: (typeof navItemKeys)[number]) =>
-    item.metaLabel ? metaPostsText(uiLocale).navLabel : item.screenKey ? dict.contentHub.screens[item.screenKey] : dict.sidebar[item.labelKey]
+    item.metaLabel ? metaPostsText(uiLocale).navLabel : item.videoLabel ? VIDEO_STUDIO_COPY[uiLocale].title : item.screenKey ? dict.contentHub.screens[item.screenKey] : dict.sidebar[item.labelKey]
   return [
     ...[...navItemKeys, ...adminNavItems].map((item) => ({ href: item.href, label: label(item) })),
     // Screens without a sidebar entry of their own.

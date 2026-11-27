@@ -20,7 +20,8 @@ export const ASPECT_RATIOS = ['9:16', '16:9'] as const
 export type AspectRatio = (typeof ASPECT_RATIOS)[number]
 
 export function isVideoStudioEnabled(): boolean {
-  return process.env.VIDEO_STUDIO_ENABLED === 'true'
+  // On by default (owner's go-live, 27.11.2026); VIDEO_STUDIO_ENABLED=false is the kill switch.
+  return process.env.VIDEO_STUDIO_ENABLED !== 'false'
 }
 
 /** Ceilings, per request and per day. A request is refused before any money is spent. */

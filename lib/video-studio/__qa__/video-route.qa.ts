@@ -48,9 +48,9 @@ const run = async (deps: any, b: any) => { const r = await H.handleGenerate(req(
 
 async function main() {
   // A) flag and auth
-  delete process.env.VIDEO_STUDIO_ENABLED
+  process.env.VIDEO_STUDIO_ENABLED = 'false'
   { const { deps, log } = makeDeps(); const r = await run(deps, good)
-    ok(r.status === 404 && log.calls.length === 0, 'A1 flag off: 404 and nothing runs') }
+    ok(r.status === 404 && log.calls.length === 0, 'A1 kill switch (VIDEO_STUDIO_ENABLED=false): 404 and nothing runs') }
   process.env.VIDEO_STUDIO_ENABLED = 'true'
   for (const [pid, st] of [['other', 403], ['anon', 401]] as const) {
     const { deps, log } = makeDeps(); const r = await run(deps, { ...good, projectId: pid })

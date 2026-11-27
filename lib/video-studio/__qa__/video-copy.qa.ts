@@ -29,7 +29,8 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\
 const page = strip(readFileSync(join(__dirname, '../../../app/(dashboard)/video-studio/page.tsx'), 'utf8'))
 ok(/if \(!isVideoStudioEnabled\(\)\) notFound\(\)/.test(page), 'page is a 404 without the flag')
 const sidebar = readFileSync(join(__dirname, '../../../components/layout/Sidebar.tsx'), 'utf8')
-ok(!/video-studio/.test(sidebar), 'no sidebar entry yet (unreachable until launch)')
+ok(/href: '\/video-studio', videoLabel: true/.test(sidebar), 'launched: the sidebar has the video studio entry')
+ok(!/href: '\/video-studio', videoLabel: true/.test(sidebar.replaceAll('/video-studio', '/x')), 'M: removing the sidebar entry fails the launch guard')
 // Mutation controls
 const broken = { ...VIDEO_STUDIO_COPY.fr, title: undefined as any }
 ok(flat(broken).some((s) => s.trim().length < 1), 'M: a missing key would be caught')
