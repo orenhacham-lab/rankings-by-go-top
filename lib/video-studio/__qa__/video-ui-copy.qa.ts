@@ -37,11 +37,13 @@ ok(/fresh && plan/.test(view), 'create is offered only for an up-to-date plan')
 ok(/errNetwork/.test(view), 'a dropped connection has its own message')
 ok(/refund-policy/.test(packs) && /t\.vatIls/.test(packs) && /t\.taxUsd/.test(packs), 'packs keep the refund link and the VAT / tax label')
 ok(/slots\.current\[id\]/.test(packs) && /packs\/creem\/checkout/.test(packs) && /packs\/paypal\/capture/.test(packs), 'both checkouts are still wired')
+ok(/download=clip\.mp4/.test(view), 'the download link asks storage for an attachment (a cross-origin download attribute alone is ignored)')
 // Mutation controls
 const broken: any = { ...VIDEO_UI_COPY.fr, goals: { ...VIDEO_UI_COPY.fr.goals, offer: undefined } }
 ok(!GOAL_IDS.every((g) => broken.goals[g]?.label), 'M: a missing goal would be caught')
 ok(!(/fresh && plan/.test(view.replace('fresh && plan', 'plan'))), 'M: dropping the freshness check fails the guard')
 ok(!(/t\.vatIls/.test(packs.replaceAll('t.vatIls', 'x'))), 'M: dropping the VAT label fails the guard')
+ok(!(/download=clip\.mp4/.test(view.replace('download=clip.mp4', 'x'))), 'M: dropping the attachment parameter fails the guard')
 console.log(`${passed} passed, ${failed} failed`)
 if (failed) process.exit(1)
 export {}

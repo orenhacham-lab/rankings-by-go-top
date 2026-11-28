@@ -180,7 +180,7 @@ function Screen({ projectId }: { projectId: string }) {
           <div className="flex items-center gap-2"><span className="inline-flex size-7 items-center justify-center rounded-pill bg-ok text-white"><Check className="size-4" aria-hidden="true" /></span><h2 className="text-lead font-bold text-ink">{u.resultReady}</h2></div>
           <video src={view.url} controls playsInline className={cn('mx-auto w-full rounded-card bg-contrast', aspect === '9:16' ? 'max-h-[70vh] max-w-xs' : 'max-w-xl')} />
           <div className="flex flex-wrap gap-2">
-            <a href={view.url} download="clip.mp4" className="inline-flex h-10 items-center gap-2 rounded-control bg-action px-4 text-copy font-semibold text-action-ink shadow-control transition-colors hover:bg-action-hover"><Download className="size-4" aria-hidden="true" />{t.download}</a>
+            <a href={`${view.url}${view.url.includes('?') ? '&' : '?'}download=clip.mp4`} download="clip.mp4" className="inline-flex h-10 items-center gap-2 rounded-control bg-action px-4 text-copy font-semibold text-action-ink shadow-control transition-colors hover:bg-action-hover"><Download className="size-4" aria-hidden="true" />{t.download}</a>
             <Button variant="secondary" disabled={short || !plan} onClick={() => plan && void create(plan.prompt)}><RotateCcw className="size-4" aria-hidden="true" />{u.makeAnother(cost)}</Button>
             <Button variant="ghost" onClick={reset}>{u.startNew}</Button>
           </div>
